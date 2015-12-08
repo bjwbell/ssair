@@ -248,14 +248,6 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	config := ssa.NewConfig(arch, &e, &link)
 	ssafn = config.NewFunc()
 	ssafn.Name = fnType.Name()
-	//s.fnInfo = fnInfo
-	//s.fnType = fnType
-	// We construct SSA using an algorithm similar to
-	// Brau, Buchwald, Hack, Leißa, Mallon, and Zwinkau
-	// http://pp.info.uni-karlsruhe.de/uploads/publikationen/braun13cc.pdf
-	// TODO: check this comment
-
-	// Allocate starting block
 	ssafn.Entry = ssafn.NewBlock(ssa.BlockPlain)
 	fmt.Println("f :", f)
 
@@ -267,21 +259,21 @@ type ssaExport struct {
 	log bool
 }
 
-func (s *ssaExport) TypeBool() ssa.Type    { return nil }
-func (s *ssaExport) TypeInt8() ssa.Type    { return nil }
-func (s *ssaExport) TypeInt16() ssa.Type   { return nil }
-func (s *ssaExport) TypeInt32() ssa.Type   { return nil }
-func (s *ssaExport) TypeInt64() ssa.Type   { return nil }
-func (s *ssaExport) TypeUInt8() ssa.Type   { return nil }
-func (s *ssaExport) TypeUInt16() ssa.Type  { return nil }
-func (s *ssaExport) TypeUInt32() ssa.Type  { return nil }
-func (s *ssaExport) TypeUInt64() ssa.Type  { return nil }
-func (s *ssaExport) TypeFloat32() ssa.Type { return nil }
-func (s *ssaExport) TypeFloat64() ssa.Type { return nil }
-func (s *ssaExport) TypeInt() ssa.Type     { return nil }
-func (s *ssaExport) TypeUintptr() ssa.Type { return nil }
-func (s *ssaExport) TypeString() ssa.Type  { return nil }
-func (s *ssaExport) TypeBytePtr() ssa.Type { return nil }
+func (s *ssaExport) TypeBool() ssa.Type    { return Typ[types.Bool] }
+func (s *ssaExport) TypeInt8() ssa.Type    { return Typ[types.Int8] }
+func (s *ssaExport) TypeInt16() ssa.Type   { return Typ[types.Int16] }
+func (s *ssaExport) TypeInt32() ssa.Type   { return Typ[types.Int32] }
+func (s *ssaExport) TypeInt64() ssa.Type   { return Typ[types.Int64] }
+func (s *ssaExport) TypeUInt8() ssa.Type   { return Typ[types.Uint8] }
+func (s *ssaExport) TypeUInt16() ssa.Type  { return Typ[types.Uint16] }
+func (s *ssaExport) TypeUInt32() ssa.Type  { return Typ[types.Uint32] }
+func (s *ssaExport) TypeUInt64() ssa.Type  { return Typ[types.Uint64] }
+func (s *ssaExport) TypeFloat32() ssa.Type { return Typ[types.Float32] }
+func (s *ssaExport) TypeFloat64() ssa.Type { return Typ[types.Float64] }
+func (s *ssaExport) TypeInt() ssa.Type     { return Typ[types.Int] }
+func (s *ssaExport) TypeUintptr() ssa.Type { return Typ[types.Uintptr] }
+func (s *ssaExport) TypeString() ssa.Type  { return Typ[types.String] }
+func (s *ssaExport) TypeBytePtr() ssa.Type { return Typ[types.Uint8].PtrTo() }
 
 // StringData returns a symbol (a *Sym wrapped in an interface) which
 // is the data component of a global string constant containing s.
