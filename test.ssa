@@ -1,0 +1,35 @@
+package test
+
+func t0() {
+b0:
+}
+
+func t1() int {
+b0:
+	return 1
+}
+
+func t2() int {
+b0:
+	x := 1
+	return x
+}
+
+func t3() int {
+b0:
+	var x int
+	x = 1
+	return x
+}
+
+func t4(x int) int {
+b0:
+	return x
+}
+
+func t5(x int) int {
+b0:
+	y := 2
+	z := x + y
+	return z
+}
