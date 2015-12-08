@@ -243,12 +243,26 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	}
 
 	var e ssaExport
+	var s state
 	e.log = true
 	link := obj.Link{}
-	config := ssa.NewConfig(arch, &e, &link)
-	ssafn = config.NewFunc()
-	ssafn.Name = fnType.Name()
-	ssafn.Entry = ssafn.NewBlock(ssa.BlockPlain)
+	s.config = ssa.NewConfig(arch, &e, &link)
+	s.f = s.config.NewFunc()
+	s.f.Name = fnType.Name()
+	s.f.Entry = s.f.NewBlock(ssa.BlockPlain)
+
+	// Allocate starting values
+	s.labels = map[string]*ssaLabel{}
+	s.labeledNodes = map[ast.Node]*ssaLabel{}
+	s.startmem = s.entryNewValue0(ssa.OpInitMem, ssa.TypeMem)
+	s.sp = s.entryNewValue0(ssa.OpSP, Typ[types.Uintptr]) // TODO: use generic pointer type (unsafe.Pointer?) instead
+	s.sb = s.entryNewValue0(ssa.OpSB, Typ[types.Uintptr])
+
+	s.startBlock(s.f.Entry)
+	//s.vars[&memVar] = s.startmem
+
+	//s.varsyms = map[*Node]interface{}{}
+
 	fmt.Println("f :", f)
 
 	return nil, false

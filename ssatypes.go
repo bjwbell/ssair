@@ -8,55 +8,6 @@ import (
 	"github.com/bjwbell/ssa"
 )
 
-type state struct {
-	// configuration (arch) information
-	config *ssa.Config
-	// context includes *token.File and *types.File
-	ctx Ctx
-
-	// function we're building
-	f      *ssa.Func
-	fnInfo *types.Info
-	fnType *types.Func
-	// labels and labeled control flow nodes (OFOR, OSWITCH, OSELECT) in f
-	labels       map[string]*ssaLabel
-	labeledNodes map[ast.Node]*ssaLabel
-
-	// gotos that jump forward; required for deferred checkgoto calls
-	fwdGotos []ast.Node
-	// Code that must precede any return
-	// (e.g., copying value of heap-escaped paramout back to true paramout)
-	//exitCode *NodeList
-
-	// unlabeled break and continue statement tracking
-	breakTo    *ssa.Block // current target for plain break statement
-	continueTo *ssa.Block // current target for plain continue statement
-
-	// current location where we're interpreting the AST
-	curBlock *ssa.Block
-
-	// variable assignments in the current block (map from variable symbol to ssa value)
-	// *Node is the unique identifier (an ONAME Node) for the variable.
-	vars map[ssaVar]*ssa.Value
-
-	// all defined variables at the end of each block.  Indexed by block ID.
-	defvars []map[ssaVar]*ssa.Value
-
-	// addresses of PPARAM and PPARAMOUT variables.
-	decladdrs map[ssaVar]*ssa.Value
-
-	// symbols for PEXTERN, PAUTO and PPARAMOUT variables so they can be reused.
-	varsyms map[ssaVar]interface{}
-
-	// starting values.  Memory, stack pointer, and globals pointer
-	startmem *ssa.Value
-	sp       *ssa.Value
-	sb       *ssa.Value
-
-	// line number stack.  The current line number is top of stack
-	line []int32
-}
-
 type ssaLabel struct {
 	target         *ssa.Block // block identified by this label
 	breakTarget    *ssa.Block // block to break to in control flow node identified by this label
