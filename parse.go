@@ -1,4 +1,4 @@
-package gcssa
+package gossa
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"github.com/bjwbell/ssa"
 )
 
-type phi struct {
+type phivar struct {
 	parent  *ast.AssignStmt
 	varName *ast.Ident
 	typ     *ast.Ident
@@ -24,20 +24,9 @@ type ssaVar struct {
 }
 
 type fnSSA struct {
-	phi        []phi
-	removedPhi []phi
-	vars       []ssaVar
-	decl       *ast.FuncDecl
-}
-
-func (fn *fnSSA) insertPhi(phi phi) {
-	phiAssign := ast.DeclStmt{}
-	stmts := []ast.Stmt{}
-	stmts = append(stmts, &phiAssign)
-	for _, stmt := range fn.decl.Body.List {
-		stmts = append(stmts, stmt)
-	}
-	fn.decl.Body.List = stmts
+	phi  []phivar
+	vars []ssaVar
+	decl *ast.FuncDecl
 }
 
 func (fn *fnSSA) initPhi() bool {
@@ -75,7 +64,7 @@ func (fn *fnSSA) initPhi() bool {
 		if phiIdent.Name != "phi" {
 			return true
 		}
-		var phi phi
+		var phi phivar
 		phi.parent = assignStmt
 		phi.expr = phiExpr
 		phi.typ = phiType
@@ -104,9 +93,9 @@ func (fn *fnSSA) restorePhi() bool {
 func ParseSSA(file, pkgName, fn string) (ssafn *ssa.Func, usessa bool) {
 	var conf types.Config
 	conf.Importer = importer.Default()
-	conf.Error = func(err error) {
+	/*conf.Error = func(err error) {
 		fmt.Println("terror:", err)
-	}
+	}*/
 	fset := token.NewFileSet()
 	fileAst, err := parser.ParseFile(fset, file, nil, parser.AllErrors)
 	fileTok := fset.File(fileAst.Pos())
@@ -114,37 +103,6 @@ func ParseSSA(file, pkgName, fn string) (ssafn *ssa.Func, usessa bool) {
 	if err != nil {
 		fmt.Printf("Error parsing %v, error message: %v\n", file, err)
 		terrors += fmt.Sprintf("err: %v\n", err)
-		return
-	}
-
-	ast.FilterFile(fileAst, func(declName string) bool {
-		return declName == fn
-	})
-
-	var fnDcl *ast.FuncDecl
-	for _, decl := range fileAst.Decls {
-		if fdecl, ok := decl.(*ast.FuncDecl); ok {
-			fnDcl = fdecl
-		}
-	}
-
-	if fnDcl == nil {
-		fmt.Printf("Error \"%v\" not found", fn)
-		return
-	}
-
-	fnSSA := fnSSA{decl: fnDcl, removedPhi: []phi{}, vars: []ssaVar{}}
-
-	if !fnSSA.removePhi() {
-		fmt.Printf("Error rewriting phi vars")
-		return
-	}
-	if !fnSSA.rewriteAssign() {
-		fmt.Printf("Error rewriting assignments")
-		return
-	}
-	if !fnSSA.restorePhi() {
-		fmt.Printf("Error rewriting phi vars")
 		return
 	}
 
