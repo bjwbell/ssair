@@ -340,39 +340,39 @@ func (s *state) stmt(stmt ast.Stmt) {
 	case *ast.AssignStmt:
 		panic("todo ast.AssignStmt")
 	case *ast.BadStmt:
-		panic("todo ast.BadStmt")
+		panic("error ast.BadStmt")
 	case *ast.BlockStmt:
 		panic("todo ast.BlockStmt")
 	case *ast.BranchStmt:
 		panic("todo ast.BranchStmt")
 	case *ast.DeclStmt:
 		panic("todo ast.DeclStmt")
-	case *ast.DeferStmt:
-		panic("todo ast.DeferStmt")
 	case *ast.EmptyStmt:
 		panic("todo ast.EmptyStmt")
 	case *ast.ExprStmt:
 		panic("todo ast.ExprStmt")
-	case *ast.ForStmt:
-		panic("todo ast.ForStmt")
-	case *ast.GoStmt:
-		panic("todo ast.GoStmt")
 	case *ast.IfStmt:
 		panic("todo ast.IfStmt")
 	case *ast.IncDecStmt:
 		panic("todo ast.IncDecStmt")
-	case *ast.RangeStmt:
-		panic("todo ast.RangeStmt")
 	case *ast.ReturnStmt:
 		panic("todo ast.ReturnStmt")
+	case *ast.ForStmt:
+		panic("unsupported: ForStmt")
+	case *ast.GoStmt:
+		panic("unsupported: GoStmt")
+	case *ast.RangeStmt:
+		panic("unsupported: RangeStmt")
+	case *ast.DeferStmt:
+		panic("unsupported: DeferStmt")
 	case *ast.SelectStmt:
-		panic("todo ast.SelectStmt")
+		panic("unsupported: SelectStmt")
 	case *ast.SendStmt:
-		panic("todo ast.SendStmt")
+		panic("unsupported: SendStmt")
 	case *ast.SwitchStmt:
-		panic("todo ast.SwitchStmt")
+		panic("unsupported: SwitchStmt")
 	case *ast.TypeSwitchStmt:
-		panic("todo ast.TypeSwitchStmt")
+		panic("unsupported: TypeSwitchStmt")
 	default:
 		fmt.Println("stmt: ", stmt)
 		panic("unknown ast.Stmt")
