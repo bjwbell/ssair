@@ -23,8 +23,8 @@ type state struct {
 	labels       map[string]*ssaLabel
 	labeledNodes map[ast.Node]*ssaLabel
 
-	// gotos that jump forward; required for deferred checkgoto calls
-	fwdGotos []ast.Node
+	// gotos that jump forward; required for deferred checkGoto calls
+	fwdGotos []*Node
 	// Code that must precede any return
 	// (e.g., copying value of heap-escaped paramout back to true paramout)
 	//exitCode *NodeList
@@ -338,13 +338,37 @@ func (s *state) stmt(stmt ast.Stmt) {
 		b.AddEdgeTo(lab.target)
 		s.startBlock(lab.target)
 	case *ast.AssignStmt:
-		panic("todo ast.AssignStmt")
+		s.assignStmt(stmt)
 	case *ast.BadStmt:
-		panic("error ast.BadStmt")
+		panic("error BadStmt")
 	case *ast.BlockStmt:
-		panic("todo ast.BlockStmt")
+		// TODO: handle correctly
+		s.stmtList(stmt.List)
 	case *ast.BranchStmt:
-		panic("todo ast.BranchStmt")
+		n := NewNode(stmt, s.ctx)
+		switch stmt.Tok {
+		case token.GOTO:
+		default:
+			panic("Error: only goto branch statements supported (not break, continue, or fallthrough ")
+		}
+
+		lab := s.label(stmt.Label)
+		if lab.target == nil {
+			lab.target = s.f.NewBlock(ssa.BlockPlain)
+		}
+		if !lab.used() {
+			lab.useNode = n
+		}
+
+		if lab.defined() {
+			s.checkGoto(n, lab.defNode)
+		} else {
+			s.fwdGotos = append(s.fwdGotos, n)
+		}
+
+		b := s.endBlock()
+		b.AddEdgeTo(lab.target)
+
 	case *ast.DeclStmt:
 		panic("todo ast.DeclStmt")
 	case *ast.EmptyStmt:
@@ -821,7 +845,8 @@ func (s *state) condBranch(cond ast.Expr, yes, no *ssa.Block) {
 	b.AddEdgeTo(no)
 }
 
-func (s *state) assign(left *Node, right *ssa.Value, wb bool) {
+//assign(left *Node, right *ssa.Value, wb bool) {
+func (s *state) assignStmt(stmt *ast.AssignStmt) {
 	/*if left.Op() == ONAME && isblank(left) {
 		return
 	}
@@ -1173,4 +1198,15 @@ func (s *state) addr(n *Node, bounded bool) *ssa.Value {
 	// 	s.Unimplementedf("unhandled addr %v", Oconv(int(n.Op()), 0))
 	// 	return nil
 	// }
+}
+
+// checkGoto checks that a goto from from to to does not
+// jump into a block
+func (s *state) checkGoto(from *Node, to *Node) {
+	// TODO: determine if goto jumps into a block
+	var block *ssa.Block
+	if block != nil {
+		s.Errorf("goto %v jumps into block starting at %v", "<checkGoto.lblName>", "<checkGoto.line#")
+	}
+
 }
