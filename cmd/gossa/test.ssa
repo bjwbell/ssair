@@ -1,28 +1,34 @@
 package test
 
 func t0() {
+_:
 }
 
 func t1() int {
+_:
 	return 1
 }
 
 func t2() int {
+_:
 	x := 1
 	return x
 }
 
 func t3() int {
+_:
 	var x int
 	x = 1
 	return x
 }
 
 func t4(x int) int {
+_:
 	return x
 }
 
 func t5(x int) int {
+_:
 	y := 2
 	z := x + y
 	return z

@@ -254,23 +254,25 @@ func (s *state) constInt(t ssa.Type, c int64) *ssa.Value {
 }
 
 func (s *state) labeledEntryBlock(block *ast.BlockStmt) bool {
-	labeledEnty := false
+	return s.entryBlockLabel(block) != nil
+}
 
+func (s *state) entryBlockLabel(block *ast.BlockStmt) *ast.LabeledStmt {
 	// the first stmt may be a label for the entry block
 	if len(block.List) >= 1 {
-		if _, ok := block.List[0].(*ast.LabeledStmt); ok {
-			labeledEnty = true
+		if labeledStmt, ok := block.List[0].(*ast.LabeledStmt); ok {
+			return labeledStmt
 		}
 
 	}
-	return labeledEnty
+	return nil
 }
 
 // body converts the body of fn to SSA and adds it to s.
 func (s *state) body(block *ast.BlockStmt) {
 
-	if s.labeledEntryBlock(block) {
-		panic("todo")
+	if !s.labeledEntryBlock(block) {
+		panic("entry block must be labeled (even if with \"_\")")
 	}
 	s.stmtList(block.List)
 }
