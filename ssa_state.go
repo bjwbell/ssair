@@ -594,30 +594,6 @@ var opToSSA = map[opAndType]ssa.Op{
 	opAndType{OSQRT, types.Float64}: ssa.OpSqrt,
 }
 
-func (s *state) concreteEtype(t *Type) uint8 {
-	return 0
-	/*e := t.Etype()
-	switch e {
-	default:
-		return e
-	case TINT:
-		if s.config.IntSize == 8 {
-			return TINT64
-		}
-		return TINT32
-	case TUINT:
-		if s.config.IntSize == 8 {
-			return TUINT64
-		}
-		return TUINT32
-	case TUINTPTR:
-		if s.config.PtrSize == 8 {
-			return TUINT64
-		}
-		return TUINT32
-	}*/
-}
-
 func (s *state) ssaOp(op NodeOp, t *Type) ssa.Op {
 	/*etype := s.concreteEtype(t)
 	x, ok := opToSSA[opAndType{op, etype}]
