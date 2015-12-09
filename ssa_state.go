@@ -19,7 +19,7 @@ type state struct {
 	f      *ssa.Func
 	fnInfo *types.Info
 	fnType *types.Func
-	// labels and labeled control flow nodes (OFOR, OSWITCH, OSELECT) in f
+	// labels and labeled control flow nodes in f
 	labels       map[string]*ssaLabel
 	labeledNodes map[ast.Node]*ssaLabel
 
@@ -115,12 +115,12 @@ func (s *state) pushLine(line int32) {
 
 // popLine pops the top of the line number stack.
 func (s *state) popLine() {
-	s.line = s.line[:len(s.line)-1]
+	//s.line = s.line[:len(s.line)-1]
 }
 
 // peekLine peek the top of the line number stack.
 func (s *state) peekLine() int32 {
-	return s.line[len(s.line)-1]
+	return 0 //s.line[len(s.line)-1]
 }
 
 func (s *state) Error(msg string, args ...interface{}) {
@@ -244,6 +244,28 @@ func (s *state) constInt(t ssa.Type, c int64) *ssa.Value {
 	return s.constInt32(t, int32(c))
 }
 
+func (s *state) labeledEntryBlock(block *ast.BlockStmt) bool {
+	labeledEnty := false
+
+	// the first stmt may be a label for the entry block
+	if len(block.List) >= 1 {
+		if _, ok := block.List[0].(*ast.LabeledStmt); ok {
+			labeledEnty = true
+		}
+
+	}
+	return labeledEnty
+}
+
+// body converts the body of fn to SSA and adds it to s.
+func (s *state) body(block *ast.BlockStmt) {
+
+	if s.labeledEntryBlock(block) {
+		panic("todo")
+	}
+	s.stmtList(block.List)
+}
+
 // ssaStmtList converts the statement n to SSA and adds it to s.
 func (s *state) stmtList(stmtList []ast.Stmt) {
 	for _, stmt := range stmtList {
@@ -273,6 +295,50 @@ func (s *state) stmt(stmt ast.Stmt) {
 	}
 
 	// TODO
+
+	switch stmt := stmt.(type) {
+	case *ast.LabeledStmt:
+		panic("todo ast.LabeledStmt")
+	case *ast.AssignStmt:
+		panic("todo ast.AssignStmt")
+	case *ast.BadStmt:
+		panic("todo ast.BadStmt")
+	case *ast.BlockStmt:
+		panic("todo ast.BlockStmt")
+	case *ast.BranchStmt:
+		panic("todo ast.BranchStmt")
+	case *ast.DeclStmt:
+		panic("todo ast.DeclStmt")
+	case *ast.DeferStmt:
+		panic("todo ast.DeferStmt")
+	case *ast.EmptyStmt:
+		panic("todo ast.EmptyStmt")
+	case *ast.ExprStmt:
+		panic("todo ast.ExprStmt")
+	case *ast.ForStmt:
+		panic("todo ast.ForStmt")
+	case *ast.GoStmt:
+		panic("todo ast.GoStmt")
+	case *ast.IfStmt:
+		panic("todo ast.IfStmt")
+	case *ast.IncDecStmt:
+		panic("todo ast.IncDecStmt")
+	case *ast.RangeStmt:
+		panic("todo ast.RangeStmt")
+	case *ast.ReturnStmt:
+		panic("todo ast.ReturnStmt")
+	case *ast.SelectStmt:
+		panic("todo ast.SelectStmt")
+	case *ast.SendStmt:
+		panic("todo ast.SendStmt")
+	case *ast.SwitchStmt:
+		panic("todo ast.SwitchStmt")
+	case *ast.TypeSwitchStmt:
+		panic("todo ast.TypeSwitchStmt")
+	default:
+		fmt.Println("stmt: ", stmt)
+		panic("unknown ast.Stmt")
+	}
 }
 
 type opAndType struct {

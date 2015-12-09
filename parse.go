@@ -147,14 +147,6 @@ func ParseSSA(file, pkgName, fn string) (ssafn *ssa.Func, usessa bool) {
 		return
 	}
 	ssafn, ok = parseSSA(fileTok, fileAst, fnDecl, function, &info)
-	if ssafn == nil || !ok {
-		fmt.Println("Error building SSA form")
-	} else {
-		fmt.Println("ssa:\n", ssafn)
-	}
-	if ssafn != nil && ok {
-		fmt.Println("ssafn:", ssafn)
-	}
 	return ssafn, ok
 }
 
@@ -251,6 +243,8 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	s.f.Name = fnType.Name()
 	s.f.Entry = s.f.NewBlock(ssa.BlockPlain)
 
+	s.startBlock(s.f.Entry)
+
 	// Allocate starting values
 	s.labels = map[string]*ssaLabel{}
 	s.labeledNodes = map[ast.Node]*ssaLabel{}
@@ -258,12 +252,13 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	s.sp = s.entryNewValue0(ssa.OpSP, Typ[types.Uintptr]) // TODO: use generic pointer type (unsafe.Pointer?) instead
 	s.sb = s.entryNewValue0(ssa.OpSB, Typ[types.Uintptr])
 
-	s.startBlock(s.f.Entry)
 	//s.vars[&memVar] = s.startmem
 
 	//s.varsyms = map[*Node]interface{}{}
 
+	s.body(fn.Body)
+
 	fmt.Println("f :", f)
 
-	return nil, false
+	return s.f, true
 }
