@@ -2,7 +2,6 @@ package gossa
 
 import (
 	"fmt"
-	"go/ast"
 	"go/types"
 
 	"github.com/bjwbell/ssa"
@@ -12,11 +11,11 @@ type ssaLabel struct {
 	target         *ssa.Block // block identified by this label
 	breakTarget    *ssa.Block // block to break to in control flow node identified by this label
 	continueTarget *ssa.Block // block to continue to in control flow node identified by this label
-	defNode        ast.Node   // label definition Node
+	defNode        *Node      // label definition Node
 	// Label use Node (OGOTO, OBREAK, OCONTINUE).
 	// Used only for error detection and reporting.
 	// There might be multiple uses, but we only need to track one.
-	useNode  ast.Node
+	useNode  *Node
 	reported bool // reported indicates whether an error has already been reported for this label
 }
 

@@ -58,6 +58,15 @@ type state struct {
 	line []int32
 }
 
+func (s *state) label(ident *ast.Ident) *ssaLabel {
+	lab := s.labels[ident.Name]
+	if lab == nil {
+		lab = new(ssaLabel)
+		s.labels[ident.Name] = lab
+	}
+	return lab
+}
+
 func (s *state) Logf(msg string, args ...interface{})   { s.config.Logf(msg, args...) }
 func (s *state) Fatalf(msg string, args ...interface{}) { s.config.Fatalf(msg, args...) }
 func (s *state) Unimplementedf(msg string, args ...interface{}) {
@@ -123,7 +132,7 @@ func (s *state) peekLine() int32 {
 	return 0 //s.line[len(s.line)-1]
 }
 
-func (s *state) Error(msg string, args ...interface{}) {
+func (s *state) Errorf(msg string, args ...interface{}) {
 	panic(msg)
 }
 
@@ -277,6 +286,10 @@ func NewNode(n ast.Node, ctx Ctx) *Node {
 	return &Node{node: n, ctx: ctx}
 }
 
+func isBlankIdent(ident *ast.Ident) bool {
+	return ident != nil && ident.Name == "_"
+}
+
 // ssaStmt converts the statement stmt to SSA and adds it to s.
 func (s *state) stmt(stmt ast.Stmt) {
 	// node := stmt.(ast.Node)
@@ -298,7 +311,30 @@ func (s *state) stmt(stmt ast.Stmt) {
 
 	switch stmt := stmt.(type) {
 	case *ast.LabeledStmt:
-		panic("todo ast.LabeledStmt")
+		lblIdent := stmt.Label
+		if isBlankIdent(lblIdent) {
+			// Empty identifier is valid but useless.
+			// See issues 11589, 11593.
+			return
+		}
+
+		lab := s.label(lblIdent)
+
+		if !lab.defined() {
+			lab.defNode = NewNode(stmt, s.ctx)
+		} else {
+			s.Errorf("label %v already defined at %v", lblIdent.Name, "<line#>")
+			lab.reported = true
+		}
+		// The label might already have a target block via a goto.
+		if lab.target == nil {
+			lab.target = s.f.NewBlock(ssa.BlockPlain)
+		}
+
+		// go to that label (we pretend "label:" is preceded by "goto label")
+		b := s.endBlock()
+		b.AddEdgeTo(lab.target)
+		s.startBlock(lab.target)
 	case *ast.AssignStmt:
 		panic("todo ast.AssignStmt")
 	case *ast.BadStmt:
