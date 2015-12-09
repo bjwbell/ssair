@@ -371,11 +371,40 @@ func (s *state) stmt(stmt ast.Stmt) {
 
 	case *ast.DeclStmt:
 		panic("todo ast.DeclStmt")
-	case *ast.EmptyStmt:
-		panic("todo ast.EmptyStmt")
+	case *ast.EmptyStmt: // No op
 	case *ast.ExprStmt:
 		panic("todo ast.ExprStmt")
 	case *ast.IfStmt:
+		var errored bool
+		if stmt.Init != nil {
+			panic("Error: if statement cannot have init expr")
+		}
+		errMsg := "Error: if statement must be of the form \"if t1 { goto lbl1 } else { goto lbl2 }\""
+		if len(stmt.Body.List) != 1 {
+			panic(errMsg)
+		}
+		bdyStmt, ok := stmt.Body.List[0].(*ast.BranchStmt)
+		errored = errored || !ok
+
+		if stmt.Else == nil {
+			errored = true
+		}
+
+		elseBody, ok := stmt.Else.(*ast.BlockStmt)
+		errored = errored || !ok
+
+		elseStmt, ok := elseBody.List[0].(*ast.BranchStmt)
+		errored = errored || !ok
+
+		condIdent, ok := stmt.Cond.(*ast.Ident)
+		errored = errored || !ok
+
+		if !errored {
+			panic(errMsg)
+		}
+		fmt.Println("if condIdent:", condIdent)
+		fmt.Println("if bdyStmt:", bdyStmt)
+		fmt.Println("if elseStmt:", elseStmt)
 		panic("todo ast.IfStmt")
 	case *ast.IncDecStmt:
 		panic("todo ast.IncDecStmt")
