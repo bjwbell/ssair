@@ -56,6 +56,9 @@ type state struct {
 
 	// line number stack.  The current line number is top of stack
 	line []int32
+
+	unlabeledBlocks []*ssa.Block
+	labledBlocks    map[string]*ssa.Block
 }
 
 func (s *state) label(ident *ast.Ident) *ssaLabel {
@@ -268,6 +271,34 @@ func (s *state) entryBlockLabel(block *ast.BlockStmt) *ast.LabeledStmt {
 	return nil
 }
 
+func (s *state) scanBlocks(fnBody *ast.BlockStmt) bool {
+	stmtList := fnBody.List
+	for _, stmt := range stmtList {
+		s.scanBlocksStmt(stmt)
+	}
+	return true
+}
+
+func (s *state) scanBlocksStmt(stmt ast.Stmt) {
+	var labelStmt *ast.LabeledStmt
+	var ok bool
+	labelStmt, ok = stmt.(*ast.LabeledStmt)
+	if !ok {
+		return
+	}
+	lblIdent := labelStmt.Label
+
+	block := s.f.NewBlock(ssa.BlockPlain)
+
+	if isBlankIdent(lblIdent) {
+		s.unlabeledBlocks = append(s.unlabeledBlocks, block)
+		return
+	} else {
+		//lab := s.label(lblIdent)
+		s.labledBlocks[lblIdent.Name] = block
+	}
+}
+
 // body converts the body of fn to SSA and adds it to s.
 func (s *state) body(block *ast.BlockStmt) {
 
@@ -405,6 +436,13 @@ func (s *state) stmt(stmt ast.Stmt) {
 		fmt.Println("if condIdent:", condIdent)
 		fmt.Println("if bdyStmt:", bdyStmt)
 		fmt.Println("if elseStmt:", elseStmt)
+		/*c := s.expr(cond)
+		b := s.endBlock()
+		b.Kind = ssa.BlockIf
+		b.Control = c
+		b.Likely = ssa.BranchPrediction(likely) // gc and ssa both use -1/0/+1 for likeliness
+		b.AddEdgeTo(yes)
+		b.AddEdgeTo(no)*/
 		panic("todo ast.IfStmt")
 	case *ast.IncDecStmt:
 		panic("todo ast.IncDecStmt")

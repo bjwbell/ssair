@@ -243,6 +243,10 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	s.f.Name = fnType.Name()
 	s.f.Entry = s.f.NewBlock(ssa.BlockPlain)
 
+	if !s.scanBlocks(fn.Body) {
+		return nil, false
+	}
+
 	s.startBlock(s.f.Entry)
 
 	// Allocate starting values
