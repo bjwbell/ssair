@@ -9,6 +9,24 @@ import (
 	"github.com/bjwbell/ssa"
 )
 
+type Block struct {
+	name  string
+	b     *ssa.Block
+	label *ast.LabeledStmt
+	stmts []ast.Stmt
+}
+
+func (b *Block) Name() string {
+	if b.label == nil {
+		panic("block label is nil")
+	}
+	if b.label.Label == nil {
+		panic("block label ident is nil")
+	}
+	name := b.label.Label.Name
+	return name
+}
+
 type state struct {
 	// configuration (arch) information
 	config *ssa.Config
@@ -57,14 +75,16 @@ type state struct {
 	// line number stack.  The current line number is top of stack
 	line []int32
 
-	unlabeledBlocks []*ssa.Block
-	labledBlocks    map[string]*ssa.Block
+	blocks []*Block
+	//unlabeledBlocks []*ssa.Block
+	//labledBlocks    map[string]*ssa.Block
 }
 
 func (s *state) label(ident *ast.Ident) *ssaLabel {
 	lab := s.labels[ident.Name]
 	if lab == nil {
 		lab = new(ssaLabel)
+		lab.name = ident.Name
 		s.labels[ident.Name] = lab
 	}
 	return lab
@@ -82,8 +102,8 @@ func (s *state) Warnl(line int, msg string, args ...interface{}) { s.config.Warn
 func (s *state) Debug_checknil() bool                            { return s.config.Debug_checknil() }
 
 var (
-// dummy node for the memory variable
-//memVar = Node{class: Pxxx}
+	// dummy node for the memory variable
+	memVar = ssaParam{}
 
 // dummy nodes for temporary variables
 /*ptrVar   = Node{Op: ONAME, Class: Pxxx, Sym: &Sym{Name: "ptr"}}
@@ -257,10 +277,10 @@ func (s *state) constInt(t ssa.Type, c int64) *ssa.Value {
 }
 
 func (s *state) labeledEntryBlock(block *ast.BlockStmt) bool {
-	return s.entryBlockLabel(block) != nil
+	return s.blockLabel(block) != nil
 }
 
-func (s *state) entryBlockLabel(block *ast.BlockStmt) *ast.LabeledStmt {
+func (s *state) blockLabel(block *ast.BlockStmt) *ast.LabeledStmt {
 	// the first stmt may be a label for the entry block
 	if len(block.List) >= 1 {
 		if labeledStmt, ok := block.List[0].(*ast.LabeledStmt); ok {
@@ -271,48 +291,110 @@ func (s *state) entryBlockLabel(block *ast.BlockStmt) *ast.LabeledStmt {
 	return nil
 }
 
-func (s *state) scanBlocks(fnBody *ast.BlockStmt) bool {
+func (s *state) scanBlocks(fnBody *ast.BlockStmt) {
 	stmtList := fnBody.List
-	for _, stmt := range stmtList {
-		s.scanBlocksStmt(stmt)
+	var block *Block
+	for i, stmt := range stmtList {
+		var labelStmt *ast.LabeledStmt
+		var isLabel bool
+		labelStmt, isLabel = stmt.(*ast.LabeledStmt)
+
+		if i == 0 {
+			if !isLabel {
+				panic("first stmt in fn isn't a label")
+			}
+		}
+
+		if !isLabel {
+			if block == nil {
+				panic("internal error")
+			}
+			block.stmts = append(block.stmts, stmt)
+			continue
+		} else {
+			lblIdent := labelStmt.Label
+			var blockLblName string
+			if isBlankIdent(lblIdent) {
+				blockLblName = "_"
+			} else {
+				blockLblName = lblIdent.Name
+			}
+			b := s.f.NewBlock(ssa.BlockPlain)
+			block = &Block{name: blockLblName, b: b, label: labelStmt}
+			block.stmts = append(block.stmts, stmt)
+			s.blocks = append(s.blocks, block)
+		}
 	}
-	return true
+
+	s.checkBlocks()
 }
 
-func (s *state) scanBlocksStmt(stmt ast.Stmt) {
-	var labelStmt *ast.LabeledStmt
-	var ok bool
-	labelStmt, ok = stmt.(*ast.LabeledStmt)
-	if !ok {
-		return
+func (s *state) checkBlocks() {
+	for _, block := range s.blocks {
+		s.checkBlock(block)
 	}
-	lblIdent := labelStmt.Label
+}
 
-	block := s.f.NewBlock(ssa.BlockPlain)
-
-	if isBlankIdent(lblIdent) {
-		s.unlabeledBlocks = append(s.unlabeledBlocks, block)
-		return
+func (s *state) checkBlock(block *Block) {
+	if len(block.stmts) < 1 {
+		s.Errorf("ERROR: block must have at least one statement")
+	}
+	if lbl, ok := block.stmts[0].(*ast.LabeledStmt); !ok {
+		s.Errorf("ERROR: block first statment must be label")
 	} else {
-		//lab := s.label(lblIdent)
-		s.labledBlocks[lblIdent.Name] = block
+		if lbl.Label.Name != block.name {
+			panic("label name doesn't match block name")
+		}
+	}
+	lastStmt := block.stmts[len(block.stmts)-1]
+	s.checkLastStmt(lastStmt)
+}
+
+func (s *state) checkLastStmt(stmt ast.Stmt) {
+	if branch, ok := stmt.(*ast.BranchStmt); ok {
+		if branch.Tok != token.GOTO {
+			s.Errorf("ERROR: only goto allowed in branch stmt not break, continue, or fallthrough")
+		}
+	} else if lbledStmt, ok := stmt.(*ast.LabeledStmt); ok {
+		s.checkLastStmt(lbledStmt.Stmt)
+	} else if ifStmt, ok := stmt.(*ast.IfStmt); ok {
+		s.checkIfStmt(ifStmt)
+	} else if _, ok := stmt.(*ast.ReturnStmt); ok {
+		//
+	} else {
+		s.Errorf("Last stmt must a transfer control")
 	}
 }
+
+func (s *state) processBlocks() {
+	for _, block := range s.blocks {
+		s.processBlock(block)
+	}
+}
+
+func (s *state) processBlock(block *Block) {
+	for _, stmt := range block.stmts {
+		s.stmt(block, stmt)
+	}
+}
+
+//func (s *state)
 
 // body converts the body of fn to SSA and adds it to s.
 func (s *state) body(block *ast.BlockStmt) {
-
 	if !s.labeledEntryBlock(block) {
 		panic("entry block must be labeled (even if with \"_\")")
 	}
-	s.stmtList(block.List)
+	s.stmtList(block.List, true)
 }
 
 // ssaStmtList converts the statement n to SSA and adds it to s.
-func (s *state) stmtList(stmtList []ast.Stmt) {
-	for _, stmt := range stmtList {
-		s.stmt(stmt)
-	}
+func (s *state) stmtList(stmtList []ast.Stmt, firstBlock bool) {
+	// firstStmt := firstBlock
+	// for _, stmt := range stmtList {
+	// 	//s.stmt(stmt, firstStmt)
+	// 	//firstStmt = false
+	// }
 }
 
 func NewNode(n ast.Node, ctx Ctx) *Node {
@@ -323,33 +405,90 @@ func isBlankIdent(ident *ast.Ident) bool {
 	return ident != nil && ident.Name == "_"
 }
 
-// ssaStmt converts the statement stmt to SSA and adds it to s.
-func (s *state) stmt(stmt ast.Stmt) {
+func blockIdx(blocks []*Block, block *Block) int {
+	for i, b := range blocks {
+		if b == block {
+			return i
+		}
+	}
+	return -1
+}
+
+func (s *state) nextBlock(block *Block) *Block {
+	i := blockIdx(s.blocks, block)
+	if i == -1 || len(s.blocks) <= i+1 {
+		return nil
+	}
+	return s.blocks[i+1]
+}
+
+func (s *state) GetBlock(ssaBlock *ssa.Block) *Block {
+	for _, block := range s.blocks {
+		if block.b == ssaBlock {
+			return block
+		}
+	}
+	return nil
+}
+
+func (s *state) getBlockFromName(name string) *Block {
+	for _, block := range s.blocks {
+		if block.name == name {
+			return block
+		}
+	}
+	return nil
+}
+
+func (s *state) checkIfStmt(stmt *ast.IfStmt) {
+	var errored bool
+	if stmt.Init != nil {
+		s.Errorf("Error: if statement cannot have init expr")
+	}
+	errMsg := "Error: if statement must be of the form \"if t1 { goto lbl1 } else { goto lbl2 }\""
+	if len(stmt.Body.List) != 1 {
+		s.Errorf(errMsg)
+	}
+	bdyStmt, ok := stmt.Body.List[0].(*ast.BranchStmt)
+	errored = errored || !ok
+
+	if stmt.Else == nil {
+		errored = true
+	}
+
+	elseBody, ok := stmt.Else.(*ast.BlockStmt)
+	errored = errored || !ok
+
+	elseStmt, ok := elseBody.List[0].(*ast.BranchStmt)
+	errored = errored || !ok
+
+	condIdent, ok := stmt.Cond.(*ast.Ident)
+	errored = errored || !ok
+
+	if errored {
+		s.Errorf(errMsg)
+	}
+	fmt.Println("if condIdent:", condIdent)
+	fmt.Println("if bdyStmt:", bdyStmt)
+	fmt.Println("if elseStmt:", elseStmt)
+	return
+}
+
+// stmt converts the statement stmt to SSA and adds it to s.
+func (s *state) stmt(block *Block, stmt ast.Stmt) {
 	// node := stmt.(ast.Node)
 	// n := &Node{node: node, ctx: s.ctx}
 	// s.pushLine(n.Lineno())
 	// defer s.popLine()
-
-	// If s.curBlock is nil, then we're about to generate dead code.
-	// We can't just short-circuit here, though,
-	// because we check labels and gotos as part of SSA generation.
-	// Provide a block for the dead code so that we don't have
-	// to add special cases everywhere else.
-	if s.curBlock == nil {
-		dead := s.f.NewBlock(ssa.BlockPlain)
-		s.startBlock(dead)
-	}
 
 	// TODO
 
 	switch stmt := stmt.(type) {
 	case *ast.LabeledStmt:
 		lblIdent := stmt.Label
-		if isBlankIdent(lblIdent) {
-			// Empty identifier is valid but useless.
-			// See issues 11589, 11593.
-			return
-		}
+		//if isBlankIdent(lblIdent) {
+		//  return
+		//}
 
 		lab := s.label(lblIdent)
 
@@ -359,33 +498,43 @@ func (s *state) stmt(stmt ast.Stmt) {
 			s.Errorf("label %v already defined at %v", lblIdent.Name, "<line#>")
 			lab.reported = true
 		}
-		// The label might already have a target block via a goto.
-		if lab.target == nil {
-			lab.target = s.f.NewBlock(ssa.BlockPlain)
+
+		if lblIdent.Name != block.Name() {
+			panic("block label name doesn't match block name")
 		}
 
+		// The label might already have a target block via a goto.
+		if lab.target == nil {
+			lab.target = block.b
+		}
+
+		s.stmt(block, stmt.Stmt)
+
 		// go to that label (we pretend "label:" is preceded by "goto label")
-		b := s.endBlock()
-		b.AddEdgeTo(lab.target)
-		s.startBlock(lab.target)
+		// b := s.endBlock()
+		// b.AddEdgeTo(lab.target)
+		// s.startBlock(lab.target)
 	case *ast.AssignStmt:
 		s.assignStmt(stmt)
 	case *ast.BadStmt:
 		panic("error BadStmt")
 	case *ast.BlockStmt:
 		// TODO: handle correctly
-		s.stmtList(stmt.List)
+		s.stmtList(stmt.List, false)
 	case *ast.BranchStmt:
 		n := NewNode(stmt, s.ctx)
 		switch stmt.Tok {
 		case token.GOTO:
 		default:
-			panic("Error: only goto branch statements supported (not break, continue, or fallthrough ")
+			s.Errorf("Error: only goto branch statements supported (not break, continue, or fallthrough ")
 		}
 
 		lab := s.label(stmt.Label)
 		if lab.target == nil {
-			lab.target = s.f.NewBlock(ssa.BlockPlain)
+			lab.target = s.getBlockFromName(lab.name).b
+			if lab.target == nil {
+				panic("nil label target block")
+			}
 		}
 		if !lab.used() {
 			lab.useNode = n
@@ -397,45 +546,14 @@ func (s *state) stmt(stmt ast.Stmt) {
 			s.fwdGotos = append(s.fwdGotos, n)
 		}
 
-		b := s.endBlock()
-		b.AddEdgeTo(lab.target)
-
+		block.b.AddEdgeTo(lab.target)
 	case *ast.DeclStmt:
 		panic("todo ast.DeclStmt")
 	case *ast.EmptyStmt: // No op
 	case *ast.ExprStmt:
 		panic("todo ast.ExprStmt")
 	case *ast.IfStmt:
-		var errored bool
-		if stmt.Init != nil {
-			panic("Error: if statement cannot have init expr")
-		}
-		errMsg := "Error: if statement must be of the form \"if t1 { goto lbl1 } else { goto lbl2 }\""
-		if len(stmt.Body.List) != 1 {
-			panic(errMsg)
-		}
-		bdyStmt, ok := stmt.Body.List[0].(*ast.BranchStmt)
-		errored = errored || !ok
-
-		if stmt.Else == nil {
-			errored = true
-		}
-
-		elseBody, ok := stmt.Else.(*ast.BlockStmt)
-		errored = errored || !ok
-
-		elseStmt, ok := elseBody.List[0].(*ast.BranchStmt)
-		errored = errored || !ok
-
-		condIdent, ok := stmt.Cond.(*ast.Ident)
-		errored = errored || !ok
-
-		if !errored {
-			panic(errMsg)
-		}
-		fmt.Println("if condIdent:", condIdent)
-		fmt.Println("if bdyStmt:", bdyStmt)
-		fmt.Println("if elseStmt:", elseStmt)
+		s.checkIfStmt(stmt)
 		/*c := s.expr(cond)
 		b := s.endBlock()
 		b.Kind = ssa.BlockIf
@@ -447,7 +565,13 @@ func (s *state) stmt(stmt ast.Stmt) {
 	case *ast.IncDecStmt:
 		panic("todo ast.IncDecStmt")
 	case *ast.ReturnStmt:
-		panic("todo ast.ReturnStmt")
+		if len(stmt.Results) > 0 {
+			panic("todo ast.ReturnStmt with results")
+		}
+		m := s.mem()
+		block.b.Kind = ssa.BlockRet
+		block.b.Control = m
+
 	case *ast.ForStmt:
 		panic("unsupported: ForStmt")
 	case *ast.GoStmt:
@@ -468,6 +592,21 @@ func (s *state) stmt(stmt ast.Stmt) {
 		fmt.Println("stmt: ", stmt)
 		panic("unknown ast.Stmt")
 	}
+}
+
+// variable returns the value of a variable at the current location.
+func (s *state) variable(name ssaVar, t ssa.Type) *ssa.Value {
+	v := s.vars[name]
+	if v == nil {
+		// TODO: get type?  Take Sym as arg?
+		v = s.newValue0A(ssa.OpFwdRef, t, name)
+		s.vars[name] = v
+	}
+	return v
+}
+
+func (s *state) mem() *ssa.Value {
+	return s.variable(&memVar, ssa.TypeMem)
 }
 
 type opAndType struct {

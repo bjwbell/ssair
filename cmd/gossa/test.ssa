@@ -1,7 +1,7 @@
 package test
 
 func t0() {
-_:
+_: return
 }
 
 func t1() int {

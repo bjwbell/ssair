@@ -156,7 +156,7 @@ type Ctx struct {
 }
 
 type ssaVar interface {
-	ssaVar()
+	ssaVarType()
 }
 
 type ssaParam struct {
@@ -241,11 +241,14 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	s.config = ssa.NewConfig(arch, &e, &link)
 	s.f = s.config.NewFunc()
 	s.f.Name = fnType.Name()
-	s.f.Entry = s.f.NewBlock(ssa.BlockPlain)
+	//s.f.Entry = s.f.NewBlock(ssa.BlockPlain)
 
-	if !s.scanBlocks(fn.Body) {
-		return nil, false
+	s.scanBlocks(fn.Body)
+	if len(s.blocks) < 1 {
+		panic("no blocks found, need at least one block per function")
 	}
+
+	s.f.Entry = s.blocks[0].b
 
 	s.startBlock(s.f.Entry)
 
@@ -256,13 +259,15 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	s.sp = s.entryNewValue0(ssa.OpSP, Typ[types.Uintptr]) // TODO: use generic pointer type (unsafe.Pointer?) instead
 	s.sb = s.entryNewValue0(ssa.OpSB, Typ[types.Uintptr])
 
-	//s.vars[&memVar] = s.startmem
+	s.vars = map[ssaVar]*ssa.Value{}
+	s.vars[&memVar] = s.startmem
 
 	//s.varsyms = map[*Node]interface{}{}
 
-	s.body(fn.Body)
+	//s.body(fn.Body)
+	s.processBlocks()
 
-	fmt.Println("f :", f)
+	fmt.Println("f:", f)
 
 	return s.f, true
 }

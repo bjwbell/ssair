@@ -8,16 +8,17 @@ import (
 )
 
 type ssaLabel struct {
-	target         *ssa.Block // block identified by this label
-	breakTarget    *ssa.Block // block to break to in control flow node identified by this label
-	continueTarget *ssa.Block // block to continue to in control flow node identified by this label
-	defNode        *Node      // label definition Node
+	target  *ssa.Block // block identified by this label
+	defNode *Node      // label definition Node
+	name    string
 	// Label use Node (OGOTO, OBREAK, OCONTINUE).
 	// Used only for error detection and reporting.
 	// There might be multiple uses, but we only need to track one.
 	useNode  *Node
 	reported bool // reported indicates whether an error has already been reported for this label
 }
+
+//func (l *ssaLabel) name() string { return l.defNode != nil }
 
 // defined reports whether the label has a definition (OLABEL node).
 func (l *ssaLabel) defined() bool { return l.defNode != nil }
