@@ -10,7 +10,6 @@ import (
 )
 
 type Block struct {
-	name  string
 	b     *ssa.Block
 	label *ast.LabeledStmt
 	stmts []ast.Stmt
@@ -18,7 +17,7 @@ type Block struct {
 
 func (b *Block) Name() string {
 	if b.label == nil {
-		panic("block label is nil")
+		return "_"
 	}
 	if b.label.Label == nil {
 		panic("block label ident is nil")
@@ -293,39 +292,25 @@ func (s *state) blockLabel(block *ast.BlockStmt) *ast.LabeledStmt {
 
 func (s *state) scanBlocks(fnBody *ast.BlockStmt) {
 	stmtList := fnBody.List
+	entryBlock := true
 	var block *Block
-	for i, stmt := range stmtList {
+	for _, stmt := range stmtList {
 		var labelStmt *ast.LabeledStmt
 		var isLabel bool
 		labelStmt, isLabel = stmt.(*ast.LabeledStmt)
-
-		if i == 0 {
-			if !isLabel {
-				panic("first stmt in fn isn't a label")
-			}
-		}
-
-		if !isLabel {
+		if isLabel || block == nil {
 			if block == nil {
-				panic("internal error")
-			}
-			block.stmts = append(block.stmts, stmt)
-			continue
-		} else {
-			lblIdent := labelStmt.Label
-			var blockLblName string
-			if isBlankIdent(lblIdent) {
-				blockLblName = "_"
-			} else {
-				blockLblName = lblIdent.Name
+				if !entryBlock {
+					panic("internal error")
+				}
+				labelStmt = nil
 			}
 			b := s.f.NewBlock(ssa.BlockPlain)
-			block = &Block{name: blockLblName, b: b, label: labelStmt}
-			block.stmts = append(block.stmts, stmt)
+			block = &Block{b: b, label: labelStmt}
 			s.blocks = append(s.blocks, block)
 		}
+		block.stmts = append(block.stmts, stmt)
 	}
-
 	s.checkBlocks()
 }
 
@@ -336,34 +321,47 @@ func (s *state) checkBlocks() {
 }
 
 func (s *state) checkBlock(block *Block) {
+	entryBlock := s.isEntryBlock(block)
 	if len(block.stmts) < 1 {
 		s.Errorf("ERROR: block must have at least one statement")
 	}
 	if lbl, ok := block.stmts[0].(*ast.LabeledStmt); !ok {
-		s.Errorf("ERROR: block first statment must be label")
+		if !entryBlock {
+			s.Errorf("ERROR: block first statment must be label")
+		}
 	} else {
-		if lbl.Label.Name != block.name {
+		if lbl.Label.Name != block.Name() {
 			panic("label name doesn't match block name")
 		}
 	}
 	lastStmt := block.stmts[len(block.stmts)-1]
-	s.checkLastStmt(lastStmt)
+	s.checkLastStmt(block, lastStmt)
 }
 
-func (s *state) checkLastStmt(stmt ast.Stmt) {
+func (s *state) checkLastStmt(block *Block, stmt ast.Stmt) {
 	if branch, ok := stmt.(*ast.BranchStmt); ok {
 		if branch.Tok != token.GOTO {
 			s.Errorf("ERROR: only goto allowed in branch stmt not break, continue, or fallthrough")
 		}
 	} else if lbledStmt, ok := stmt.(*ast.LabeledStmt); ok {
-		s.checkLastStmt(lbledStmt.Stmt)
+		if len(block.stmts) > 1 {
+			s.Errorf("Block can't have multiple labels")
+		}
+		s.checkLastStmt(block, lbledStmt.Stmt)
 	} else if ifStmt, ok := stmt.(*ast.IfStmt); ok {
 		s.checkIfStmt(ifStmt)
 	} else if _, ok := stmt.(*ast.ReturnStmt); ok {
 		//
 	} else {
-		s.Errorf("Last stmt must a transfer control")
+		// the entry block doesn't have to explicitly transfer control
+		if !s.isEntryBlock(block) {
+			s.Errorf("Last stmt must a transfer control")
+		}
 	}
+}
+
+func (s *state) isEntryBlock(block *Block) bool {
+	return block == s.blocks[0]
 }
 
 func (s *state) processBlocks() {
@@ -433,7 +431,7 @@ func (s *state) GetBlock(ssaBlock *ssa.Block) *Block {
 
 func (s *state) getBlockFromName(name string) *Block {
 	for _, block := range s.blocks {
-		if block.name == name {
+		if block.Name() == name {
 			return block
 		}
 	}
