@@ -349,7 +349,10 @@ func (s *state) checkLastStmt(block *Block, stmt ast.Stmt) {
 		}
 		s.checkLastStmt(block, lbledStmt.Stmt)
 	} else if ifStmt, ok := stmt.(*ast.IfStmt); ok {
-		s.checkIfStmt(ifStmt)
+		_, _, _, err := s.matchIfStmt(ifStmt)
+		if err != nil {
+			s.Errorf(fmt.Sprintf("%v", err))
+		}
 	} else if _, ok := stmt.(*ast.ReturnStmt); ok {
 		//
 	} else {
@@ -438,16 +441,18 @@ func (s *state) getBlockFromName(name string) *Block {
 	return nil
 }
 
-func (s *state) checkIfStmt(stmt *ast.IfStmt) {
+func (s *state) matchIfStmt(stmt *ast.IfStmt) (condIdent *ast.Ident, yesLabel string, noLabel string, err error) {
 	var errored bool
+	var ok bool
 	if stmt.Init != nil {
 		s.Errorf("Error: if statement cannot have init expr")
 	}
 	errMsg := "Error: if statement must be of the form \"if t1 { goto lbl1 } else { goto lbl2 }\""
 	if len(stmt.Body.List) != 1 {
-		s.Errorf(errMsg)
+		return nil, "", "", fmt.Errorf(errMsg)
 	}
-	bdyStmt, ok := stmt.Body.List[0].(*ast.BranchStmt)
+
+	bodyStmt, ok := stmt.Body.List[0].(*ast.BranchStmt)
 	errored = errored || !ok
 
 	if stmt.Else == nil {
@@ -460,16 +465,19 @@ func (s *state) checkIfStmt(stmt *ast.IfStmt) {
 	elseStmt, ok := elseBody.List[0].(*ast.BranchStmt)
 	errored = errored || !ok
 
-	condIdent, ok := stmt.Cond.(*ast.Ident)
+	condIdent, ok = stmt.Cond.(*ast.Ident)
 	errored = errored || !ok
 
 	if errored {
-		s.Errorf(errMsg)
+		return nil, "", "", fmt.Errorf(errMsg)
 	}
+
+	yesLabel = bodyStmt.Label.Name
+	noLabel = elseStmt.Label.Name
 	fmt.Println("if condIdent:", condIdent)
-	fmt.Println("if bdyStmt:", bdyStmt)
+	fmt.Println("if bdyStmt:", bodyStmt)
 	fmt.Println("if elseStmt:", elseStmt)
-	return
+	return condIdent, yesLabel, noLabel, nil
 }
 
 // stmt converts the statement stmt to SSA and adds it to s.
@@ -551,22 +559,28 @@ func (s *state) stmt(block *Block, stmt ast.Stmt) {
 	case *ast.ExprStmt:
 		panic("todo ast.ExprStmt")
 	case *ast.IfStmt:
-		s.checkIfStmt(stmt)
-		/*c := s.expr(cond)
-		b := s.endBlock()
-		b.Kind = ssa.BlockIf
-		b.Control = c
-		b.Likely = ssa.BranchPrediction(likely) // gc and ssa both use -1/0/+1 for likeliness
-		b.AddEdgeTo(yes)
-		b.AddEdgeTo(no)*/
-		panic("todo ast.IfStmt")
+		condIdent, yes, no, err := s.matchIfStmt(stmt)
+		if err != nil {
+			break
+		}
+		c := s.expr(&Node{node: condIdent, ctx: s.ctx})
+		block.b.Kind = ssa.BlockIf
+		block.b.Control = c
+		block.b.Likely = ssa.BranchUnknown
+		yesBlock := s.getBlockFromName(yes)
+		noBlock := s.getBlockFromName(no)
+		block.b.AddEdgeTo(yesBlock.b)
+		block.b.AddEdgeTo(noBlock.b)
 	case *ast.IncDecStmt:
 		panic("todo ast.IncDecStmt")
 	case *ast.ReturnStmt:
-		if len(stmt.Results) > 0 {
-			panic("todo ast.ReturnStmt with results")
+		if len(stmt.Results) > 1 {
+			panic("unsupported: multiple return values")
 		}
 		m := s.mem()
+		if len(stmt.Results) == 1 {
+			fmt.Println("TODO: assign return value to return memvar")
+		}
 		block.b.Kind = ssa.BlockRet
 		block.b.Control = m
 
@@ -1051,39 +1065,68 @@ func (s *state) condBranch(cond ast.Expr, yes, no *ssa.Block) {
 
 //assign(left *Node, right *ssa.Value, wb bool) {
 func (s *state) assignStmt(stmt *ast.AssignStmt) {
-	/*if left.Op() == ONAME && isblank(left) {
+	if len(stmt.Lhs) > 1 || len(stmt.Rhs) > 1 {
+		s.Errorf("Multivalue assignments not allowed")
 		return
 	}
-	t := left.Type
-	dowidth(t)
-	if right == nil {
-		// right == nil means use the zero value of the assigned type.
-		if !canSSA(left) {
-			// if we can't ssa this memory, treat it as just zeroing out the backing memory
-			//addr := s.addr(left, false)
-			if left.Op() == ONAME {
-				s.vars[&memVar] = s.newValue1A(ssa.OpVarDef, ssa.TypeMem, left, s.mem())
-			}
-			s.vars[&memVar] = s.newValue2I(ssa.OpZero, ssa.TypeMem, t.Size(), addr, s.mem())
+	if len(stmt.Lhs) == 0 || len(stmt.Rhs) == 0 {
+		panic("internal error")
+	}
+	leftExpr := stmt.Lhs[0]
+	rightExpr := stmt.Rhs[0]
+	leftIdent, ok := leftExpr.(*ast.Ident)
+	if !ok {
+		s.Errorf("expected ident")
+		return
+	}
+	rightValue := s.expr(&Node{node: rightExpr, ctx: s.ctx, class: PAUTO})
+	if stmt.Tok == token.DEFINE {
+		leftNode := &Node{node: leftIdent, ctx: s.ctx, class: PAUTO}
+		leftVar := &ssaId{assign: stmt, ctx: s.ctx}
+		s.addNamedValue(leftNode, rightValue)
+		if canSSA(leftNode) {
+			// Update variable assignment.
+			s.vars[leftVar] = rightValue
+			s.addNamedValue(leftNode, rightValue)
 			return
+		} else {
+			panic("can't ssa node")
 		}
-		right = s.zeroVal(t)
+	} else {
+		panic("non defining assignments not implemented")
 	}
-	if left.Op() == ONAME && canSSA(left) {
-		// Update variable assignment.
-		//s.vars[left] = right
-		s.addNamedValue(left, right)
+
+}
+
+func canSSA(n *Node) bool {
+	return true
+}
+
+func (s *state) addNamedValue(n *Node, v *ssa.Value) {
+	if n.class == Pxxx {
+		// Don't track our dummy nodes (&memVar etc.).
 		return
 	}
-	// not ssa-able.  Treat as a store.
-	addr := s.addr(left, false)
-	if left.Op() == ONAME {
-		s.vars[&memVar] = s.newValue1A(ssa.OpVarDef, ssa.TypeMem, left, s.mem())
+	if v == nil {
+		panic("nil *ssa.Value")
 	}
-	s.vars[&memVar] = s.newValue3I(ssa.OpStore, ssa.TypeMem, t.Size(), addr, right, s.mem())
-	if wb {
-		s.insertWB(left.Type, addr, left.Lineno())
-	}*/
+	if v.Type == nil {
+		panic("nil v.Type (*ssa.Value)")
+	}
+	if n.class == PAUTO && (v.Type.IsString() || v.Type.IsSlice() || v.Type.IsInterface()) {
+		// TODO: can't handle auto compound objects with pointers yet.
+		return
+	}
+	// if n.Class == PAUTO && n.Xoffset != 0 {
+	// 	s.Fatalf("AUTO var with offset %s %d", n, n.Xoffset)
+	// }
+
+	loc := ssa.LocalSlot{N: n, Type: n.Typ(), Off: 0}
+	values, ok := s.f.NamedValues[loc]
+	if !ok {
+		s.f.Names = append(s.f.Names, loc)
+	}
+	s.f.NamedValues[loc] = append(values, v)
 }
 
 // zeroVal returns the zero value for type t.

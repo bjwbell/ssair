@@ -1,11 +1,51 @@
 package gossa
 
-import "go/ast"
+import (
+	"fmt"
+	"go/ast"
+
+	"github.com/bjwbell/ssa"
+)
 
 type Node struct {
-	node ast.Node
-	ctx  Ctx
+	node  ast.Node
+	ctx   Ctx
+	class NodeClass
 }
+
+func (n *Node) String() string {
+	return fmt.Sprintf("%#v", n)
+}
+
+func (n *Node) Typ() ssa.Type {
+	switch node := n.node.(type) {
+	case *ast.Ident:
+		t := &Type{n.ctx.fn.ObjectOf(node).Type()}
+		return t
+	case ast.Expr:
+		t := &Type{n.ctx.fn.TypeOf(node)}
+		return t
+	default:
+		panic("can't get type of node")
+	}
+}
+
+type NodeClass uint8
+
+// declaration context
+const (
+	Pxxx      NodeClass = iota
+	PEXTERN             // global variable
+	PAUTO               // local variables
+	PPARAM              // input arguments
+	PPARAMOUT           // output results
+	PPARAMREF           // closure variable reference
+	PFUNC               // global function
+
+	PDISCARD // discard during parse of duplicate import
+
+	PHEAP NodeClass = 1 << 7 // an extra bit to identify an escaped variable
+)
 
 // Node ops.
 type NodeOp uint8
