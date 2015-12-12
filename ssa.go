@@ -565,9 +565,9 @@ func (s *state) stmt(block *Block, stmt ast.Stmt) {
 		case token.TYPE:
 			panic("internal error")
 		case token.CONST:
-			panic("unimplementedf")
+			// panic("unimplementedf")
 		case token.VAR:
-			panic("unimplementedf")
+			// panic("unimplementedf")
 		default:
 			panic("internal error")
 		}
@@ -1120,7 +1120,9 @@ func (s *state) expr(n *Node) *ssa.Value {
 			s.Unimplementedf("unhandled literal %#v", expr)
 			return nil
 		}
-
+	case *ast.BinaryExpr:
+		// TODO
+		panic("unimplementedf *ast.BinaryExpr")
 	default:
 		panic(fmt.Sprintf("unimplemented expr: %#v", expr))
 	}
@@ -1197,8 +1199,21 @@ func (s *state) assignStmt(stmt *ast.AssignStmt) {
 		} else {
 			panic("can't ssa node")
 		}
+	} else if stmt.Tok == token.ASSIGN {
+		//panic("non defining assignments not implemented")
+		leftNode := &Node{node: leftIdent, ctx: s.ctx, class: PAUTO}
+		leftVar := &ssaId{assign: stmt, ctx: s.ctx}
+		s.addNamedValue(leftNode, rightValue)
+		if canSSA(leftNode) {
+			// Update variable assignment.
+			s.vars[leftVar] = rightValue
+			s.addNamedValue(leftNode, rightValue)
+			return
+		} else {
+			panic("can't ssa node")
+		}
 	} else {
-		panic("non defining assignments not implemented")
+		panic("internal error")
 	}
 
 }
