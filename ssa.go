@@ -36,6 +36,7 @@ type state struct {
 	f      *ssa.Func
 	fnInfo *types.Info
 	fnType *types.Func
+	fnDecl *ast.FuncDecl
 	// labels and labeled control flow nodes in f
 	labels       map[string]*ssaLabel
 	labeledNodes map[ast.Node]*ssaLabel
@@ -1015,10 +1016,42 @@ func (s *state) ssaRotateOp(op NodeOp, t *Type) ssa.Op {
 	return x*/
 }
 
+func (s *state) ssaVar(n *Node) ssaVar {
+	// fn := s.ctx.fn
+	// scope := fn.Scopes[n.node]
+	// typeObject := scope.Lookup(n.Name())
+	// if typeObject == nil {
+	// 	panic("couldn't lookup node in scope")
+	// }
+	// typeObject.
+	// fn.Defs
+
+	vars := getVars(s.ctx, s.fnDecl, s.fnType)
+	for _, v := range vars {
+		if v.Name() == n.Name() {
+			return v
+		}
+	}
+	panic("couldn't find var for node n")
+}
+
 // expr converts the expression n to ssa, adds it to s and returns the ssa result.
 func (s *state) expr(n *Node) *ssa.Value {
+	//return nil
 	// TODO
-	return nil
+	//s.stmtList(n.Ninit)
+	switch expr := n.node.(type) {
+	case *ast.Ident:
+		if canSSA(n) {
+			ssaVar := s.ssaVar(n)
+			return s.variable(ssaVar, n.Typ())
+		}
+		panic(fmt.Sprintf("unimplementedf for expr: %#v", expr))
+		// addr := s.addr(n, false)
+		// return s.newValue2(ssa.OpLoad, n.Type, addr, s.mem())
+	default:
+		panic("unhandled case")
+	}
 }
 
 // condBranch evaluates the boolean expression cond and branches to yes

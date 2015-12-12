@@ -157,6 +157,7 @@ type Ctx struct {
 
 type ssaVar interface {
 	ssaVarType()
+	Name() string
 }
 
 type ssaParam struct {
@@ -165,10 +166,27 @@ type ssaParam struct {
 	ctx   Ctx
 }
 
+func (p *ssaParam) Name() string {
+	return p.ident.Name
+}
+
 type ssaId struct {
 	ssaVar
 	assign *ast.AssignStmt
 	ctx    Ctx
+}
+
+func (local *ssaId) Name() string {
+	if len(local.assign.Lhs) != 1 {
+		panic("multiple assignments not supported")
+	}
+	lhs := local.assign.Lhs[0]
+	if ident, ok := lhs.(*ast.Ident); !ok {
+		panic("expected identifier")
+	} else {
+		return ident.Name
+	}
+
 }
 
 func getParameters(ctx Ctx, fn *ast.FuncDecl) []*ssaParam {
@@ -217,6 +235,27 @@ func getLocalDecls(ctx Ctx, fn *types.Func) []*ssaId {
 	return locals
 }
 
+func getVars(ctx Ctx, fnDecl *ast.FuncDecl, fnType *types.Func) []ssaVar {
+	var vars []ssaVar
+	params := getParameters(ctx, fnDecl)
+	locals := getLocalDecls(ctx, fnType)
+	for _, p := range params {
+		for _, local := range locals {
+			if p.Name() == local.Name() {
+				panic("param and local with same name")
+			}
+		}
+	}
+	for _, p := range params {
+		vars = append(vars, p)
+	}
+
+	for _, local := range locals {
+		vars = append(vars, local)
+	}
+	return vars
+}
+
 func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Func, fnInfo *types.Info) (ssafn *ssa.Func, ok bool) {
 
 	// HACK, hardcoded
@@ -238,6 +277,8 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	var s state
 	e.log = true
 	link := obj.Link{}
+	s.ctx = Ctx{ftok, fnInfo}
+	s.fnDecl = fn
 	s.config = ssa.NewConfig(arch, &e, &link)
 	s.f = s.config.NewFunc()
 	s.f.Name = fnType.Name()

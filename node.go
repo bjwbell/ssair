@@ -30,6 +30,14 @@ func (n *Node) Typ() ssa.Type {
 	}
 }
 
+func (n *Node) Name() string {
+	switch node := n.node.(type) {
+	case *ast.Ident:
+		return node.Name
+	}
+	panic("unandled case for node.Name")
+}
+
 type NodeClass uint8
 
 // declaration context
