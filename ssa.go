@@ -3,6 +3,7 @@ package gossa
 import (
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 
@@ -380,8 +381,6 @@ func (s *state) processBlock(block *Block) {
 	}
 }
 
-//func (s *state)
-
 // body converts the body of fn to SSA and adds it to s.
 func (s *state) body(block *ast.BlockStmt) {
 	if !s.labeledEntryBlock(block) {
@@ -555,7 +554,24 @@ func (s *state) stmt(block *Block, stmt ast.Stmt) {
 
 		block.b.AddEdgeTo(lab.target)
 	case *ast.DeclStmt:
-		panic("todo ast.DeclStmt")
+		decl, ok := stmt.Decl.(*ast.GenDecl)
+		if !ok {
+			panic("expected *ast.GenDecl")
+
+		}
+		switch decl.Tok {
+		case token.IMPORT:
+			panic("internal error")
+		case token.TYPE:
+			panic("internal error")
+		case token.CONST:
+			panic("unimplementedf")
+		case token.VAR:
+			panic("unimplementedf")
+		default:
+			panic("internal error")
+		}
+		//panic(fmt.Sprintf("todo ast.DeclStmt: %#v", stmt))
 	case *ast.EmptyStmt: // No op
 	case *ast.ExprStmt:
 		panic("todo ast.ExprStmt")
@@ -1040,6 +1056,8 @@ func (s *state) expr(n *Node) *ssa.Value {
 	//return nil
 	// TODO
 	//s.stmtList(n.Ninit)
+	ctx := s.ctx
+
 	switch expr := n.node.(type) {
 	case *ast.Ident:
 		if canSSA(n) {
@@ -1049,8 +1067,62 @@ func (s *state) expr(n *Node) *ssa.Value {
 		panic(fmt.Sprintf("unimplementedf for expr: %#v", expr))
 		// addr := s.addr(n, false)
 		// return s.newValue2(ssa.OpLoad, n.Type, addr, s.mem())
+	case *ast.BasicLit:
+		typeAndValue := ctx.fn.Types[expr]
+		// t := typeAndValue.Type
+		v := typeAndValue.Value
+
+		switch v.Kind() {
+		case constant.Int:
+			i, ok := constant.Int64Val(v)
+			if !ok {
+				panic("internal error")
+			}
+			switch n.Typ().Size() {
+			case 1:
+				return s.constInt8(n.Typ(), int8(i))
+			case 2:
+				return s.constInt16(n.Typ(), int16(i))
+			case 4:
+				return s.constInt32(n.Typ(), int32(i))
+			case 8:
+				return s.constInt64(n.Typ(), i)
+			default:
+				s.Fatalf("bad integer size %d", n.Typ().Size())
+				return nil
+			}
+		case constant.String:
+			return s.entryNewValue0A(ssa.OpConstString, n.Typ(), constant.StringVal(v))
+		case constant.Bool:
+			return s.constBool(constant.BoolVal(v))
+		case constant.Unknown:
+			panic("unknown basic literal")
+
+		case constant.Float:
+			f, ok := constant.Float64Val(v)
+			if !ok {
+				panic("internal error")
+			}
+			switch n.Typ().Size() {
+			case 4:
+				// -0.0 literals need to be treated as if they were 0.0, adding 0.0 here
+				// accomplishes this while not affecting other values.
+				return s.constFloat32(n.Typ(), float64(float32(f)+0.0))
+			case 8:
+				return s.constFloat64(n.Typ(), f+0.0)
+			default:
+				s.Fatalf("bad float size %d", n.Typ().Size())
+				return nil
+			}
+		case constant.Complex:
+			panic("complex numbers not supported")
+		default:
+			s.Unimplementedf("unhandled literal %#v", expr)
+			return nil
+		}
+
 	default:
-		panic("unhandled case")
+		panic(fmt.Sprintf("unimplemented expr: %#v", expr))
 	}
 }
 
