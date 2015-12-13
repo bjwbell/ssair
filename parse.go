@@ -162,74 +162,63 @@ type ssaVar interface {
 
 type ssaParam struct {
 	ssaVar
-	ident *ast.Ident
-	ctx   Ctx
+	v   *types.Var
+	ctx Ctx
 }
 
 func (p *ssaParam) Name() string {
-	return p.ident.Name
+	return p.v.Name()
 }
 
-type ssaId struct {
+type ssaLocal struct {
 	ssaVar
-	assign *ast.AssignStmt
-	ctx    Ctx
+	obj types.Object
+	ctx Ctx
 }
 
-func (local *ssaId) Name() string {
-	if len(local.assign.Lhs) != 1 {
-		panic("multiple assignments not supported")
-	}
-	lhs := local.assign.Lhs[0]
-	if ident, ok := lhs.(*ast.Ident); !ok {
-		panic("expected identifier")
-	} else {
-		return ident.Name
-	}
-
+func (local *ssaLocal) Name() string {
+	return local.obj.Name()
 }
 
-func getParameters(ctx Ctx, fn *ast.FuncDecl) []*ssaParam {
+func getParameters(ctx Ctx, fn *types.Func) []*ssaParam {
+	signature := fn.Type().(*types.Signature)
+	if signature.Recv() != nil {
+		panic("methods unsupported (only functions are supported)")
+	}
 	var params []*ssaParam
-	for i := 0; i < fn.Type.Params.NumFields(); i++ {
-		for _, param := range fn.Type.Params.List {
-			for _, name := range param.Names {
-				n := ssaParam{ident: name, ctx: ctx}
-				params = append(params, &n)
-			}
-		}
-
+	for i := 0; i < signature.Params().Len(); i++ {
+		param := signature.Params().At(i)
+		n := ssaParam{v: param, ctx: ctx}
+		params = append(params, &n)
 	}
 	return params
-
 }
 
 func linenum(f *token.File, p token.Pos) int32 {
 	return int32(f.Line(p))
 }
 
-func getIdent(ctx Ctx, obj types.Object) *ast.Ident {
-	for ident, obj := range ctx.fn.Defs {
-		if obj == obj {
-			return ident
+func isParam(ctx Ctx, fn *types.Func, obj types.Object) bool {
+	params := getParameters(ctx, fn)
+	for _, p := range params {
+		if p.v.Id() == obj.Id() {
+			return true
 		}
 	}
-	return nil
+	return false
 }
 
-func getLocalDecls(ctx Ctx, fn *types.Func) []*ssaId {
+func getLocalDecls(ctx Ctx, fnDecl *ast.FuncDecl, fn *types.Func) []*ssaLocal {
 	scope := fn.Scope()
 	names := scope.Names()
-	var locals []*ssaId
+	var locals []*ssaLocal
 	for i := 0; i < len(names); i++ {
 		name := names[i]
 		obj := scope.Lookup(name)
-		ident := getIdent(ctx, obj)
-		if ident == nil {
-			panic(fmt.Sprintf("Couldn't lookup: %v", name))
+		if isParam(ctx, fn, obj) {
+			continue
 		}
-		//node := ssaId{assign: ident, ctx: ctx}
-		node := ssaId{assign: nil, ctx: ctx}
+		node := ssaLocal{obj: obj, ctx: ctx}
 		locals = append(locals, &node)
 	}
 	return locals
@@ -237,11 +226,12 @@ func getLocalDecls(ctx Ctx, fn *types.Func) []*ssaId {
 
 func getVars(ctx Ctx, fnDecl *ast.FuncDecl, fnType *types.Func) []ssaVar {
 	var vars []ssaVar
-	params := getParameters(ctx, fnDecl)
-	locals := getLocalDecls(ctx, fnType)
+	params := getParameters(ctx, fnType)
+	locals := getLocalDecls(ctx, fnDecl, fnType)
 	for _, p := range params {
 		for _, local := range locals {
 			if p.Name() == local.Name() {
+				fmt.Printf("p.Name(): %v, local.Name(): %v\n", p.Name(), local.Name())
 				panic("param and local with same name")
 			}
 		}
@@ -279,6 +269,8 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	link := obj.Link{}
 	s.ctx = Ctx{ftok, fnInfo}
 	s.fnDecl = fn
+	s.fnType = fnType
+	s.fnInfo = fnInfo
 	s.config = ssa.NewConfig(arch, &e, &link)
 	s.f = s.config.NewFunc()
 	s.f.Name = fnType.Name()

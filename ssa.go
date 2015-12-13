@@ -402,6 +402,10 @@ func NewNode(n ast.Node, ctx Ctx) *Node {
 	return &Node{node: n, ctx: ctx}
 }
 
+func ExprNode(n ast.Expr, ctx Ctx) *Node {
+	return &Node{node: n, ctx: ctx}
+}
+
 func isBlankIdent(ident *ast.Ident) bool {
 	return ident != nil && ident.Name == "_"
 }
@@ -1048,6 +1052,7 @@ func (s *state) ssaVar(n *Node) ssaVar {
 			return v
 		}
 	}
+	fmt.Printf("n: %#v", n)
 	panic("couldn't find var for node n")
 }
 
@@ -1122,6 +1127,41 @@ func (s *state) expr(n *Node) *ssa.Value {
 		}
 	case *ast.BinaryExpr:
 		// TODO
+		switch expr.Op {
+		case token.ADD:
+			return s.entryNewValue2(ssa.OpAdd64, n.Typ(), s.expr(ExprNode(expr.X, s.ctx)), s.expr(ExprNode(expr.Y, s.ctx)))
+		case token.SUB:
+			//
+		case token.MUL:
+			//
+		case token.QUO:
+			//
+		case token.REM:
+			//
+		case token.AND:
+			//
+		case token.OR:
+			//
+		case token.XOR:
+			//
+		case token.SHL:
+			//
+		case token.SHR:
+			//
+		case token.AND_NOT:
+			//
+		case token.LAND:
+			//
+		case token.LEQ:
+			//
+		case token.LOR:
+			//
+		case token.LSS:
+			//
+		case token.GTR:
+			//
+
+		}
 		panic("unimplementedf *ast.BinaryExpr")
 	default:
 		panic(fmt.Sprintf("unimplemented expr: %#v", expr))
@@ -1189,7 +1229,8 @@ func (s *state) assignStmt(stmt *ast.AssignStmt) {
 	rightValue := s.expr(&Node{node: rightExpr, ctx: s.ctx, class: PAUTO})
 	if stmt.Tok == token.DEFINE {
 		leftNode := &Node{node: leftIdent, ctx: s.ctx, class: PAUTO}
-		leftVar := &ssaId{assign: stmt, ctx: s.ctx}
+		leftObj := s.fnInfo.ObjectOf(leftIdent)
+		leftVar := &ssaLocal{obj: leftObj, ctx: s.ctx}
 		s.addNamedValue(leftNode, rightValue)
 		if canSSA(leftNode) {
 			// Update variable assignment.
@@ -1200,9 +1241,9 @@ func (s *state) assignStmt(stmt *ast.AssignStmt) {
 			panic("can't ssa node")
 		}
 	} else if stmt.Tok == token.ASSIGN {
-		//panic("non defining assignments not implemented")
 		leftNode := &Node{node: leftIdent, ctx: s.ctx, class: PAUTO}
-		leftVar := &ssaId{assign: stmt, ctx: s.ctx}
+		leftObj := s.fnInfo.ObjectOf(leftIdent)
+		leftVar := &ssaLocal{obj: leftObj, ctx: s.ctx}
 		s.addNamedValue(leftNode, rightValue)
 		if canSSA(leftNode) {
 			// Update variable assignment.
