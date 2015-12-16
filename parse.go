@@ -158,6 +158,9 @@ type Ctx struct {
 type ssaVar interface {
 	ssaVarType()
 	Name() string
+	Class() NodeClass
+	String() string
+	Typ() ssa.Type
 }
 
 type ssaParam struct {
@@ -170,6 +173,18 @@ func (p *ssaParam) Name() string {
 	return p.v.Name()
 }
 
+func (p ssaParam) String() string {
+	return fmt.Sprintf("{ssaParam: %v}", p.Name())
+}
+
+func (p *ssaParam) Class() NodeClass {
+	return PPARAM
+}
+
+func (p ssaParam) Typ() ssa.Type {
+	return &Type{p.v.Type()}
+}
+
 type ssaLocal struct {
 	ssaVar
 	obj types.Object
@@ -178,6 +193,18 @@ type ssaLocal struct {
 
 func (local *ssaLocal) Name() string {
 	return local.obj.Name()
+}
+
+func (local ssaLocal) String() string {
+	return fmt.Sprintf("{ssaLocal: %v}", local.Name())
+}
+
+func (local *ssaLocal) Class() NodeClass {
+	return PAUTO
+}
+
+func (local ssaLocal) Typ() ssa.Type {
+	return &Type{local.obj.Type()}
 }
 
 func getParameters(ctx Ctx, fn *types.Func) []*ssaParam {
@@ -296,6 +323,44 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	s.vars[&memVar] = s.startmem
 
 	//s.varsyms = map[*Node]interface{}{}
+
+	// Generate addresses of local declarations
+	s.decladdrs = map[ssaVar]*ssa.Value{}
+	vars := getVars(s.ctx, fn, fnType)
+	for _, v := range vars {
+		switch v.Class() {
+		case PPARAM:
+			//aux := s.lookupSymbol(n, &ssa.ArgSymbol{Typ: n.Type, Node: n})
+			//s.decladdrs[n] = s.entryNewValue1A(ssa.OpAddr, Ptrto(n.Type), aux, s.sp)
+		case PAUTO | PHEAP:
+			// TODO this looks wrong for PAUTO|PHEAP, no vardef, but also no definition
+			//aux := s.lookupSymbol(n, &ssa.AutoSymbol{Typ: n.Type, Node: n})
+			//s.decladdrs[n] = s.entryNewValue1A(ssa.OpAddr, Ptrto(n.Type), aux, s.sp)
+		case PPARAM | PHEAP, PPARAMOUT | PHEAP:
+		// This ends up wrong, have to do it at the PARAM node instead.
+		case PAUTO, PPARAMOUT:
+			// processed at each use, to prevent Addr coming
+			// before the decl.
+		case PFUNC:
+			// local function - already handled by frontend
+		default:
+			str := ""
+			if v.Class()&PHEAP != 0 {
+				str = ",heap"
+			}
+			s.Unimplementedf("local variable with class %s%s unimplemented", v.Class(), str)
+		}
+	}
+
+	//fnType.Pkg()
+	//
+
+	fpVar := types.NewVar(0, fnType.Pkg(), ".fp", Typ[types.Int32].Type)
+	nodfp := &ssaParam{v: fpVar, ctx: s.ctx}
+
+	// nodfp is a special argument which is the function's FP.
+	aux := &ssa.ArgSymbol{Typ: Typ[types.Uintptr], Node: nodfp}
+	s.decladdrs[nodfp] = s.entryNewValue1A(ssa.OpAddr, Typ[types.Uintptr], aux, s.sp)
 
 	//s.body(fn.Body)
 	s.processBlocks()
