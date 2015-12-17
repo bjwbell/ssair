@@ -598,10 +598,12 @@ func (s *state) stmt(block *Block, stmt ast.Stmt) {
 		if len(stmt.Results) > 1 {
 			panic("unsupported: multiple return values")
 		}
-		m := s.mem()
 		if len(stmt.Results) == 1 {
-			fmt.Println("TODO: assign return value to return memvar")
+			res := stmt.Results[0]
+			v := s.expr(NewNode(res, s.ctx))
+			s.vars[&memVar] = v
 		}
+		m := s.mem()
 		block.b.Kind = ssa.BlockRet
 		block.b.Control = m
 
