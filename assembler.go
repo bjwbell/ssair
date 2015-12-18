@@ -558,7 +558,7 @@ func Assemble(fn []*Prog) (assembly string) {
 	return assembly
 }
 
-func GenSSA(f *ssa.Func) (fnProg []*Prog, ok bool) {
+func GenProg(f *ssa.Func) (fnProg []*Prog, ok bool) {
 
 	Pc := new(Prog)
 
@@ -1287,6 +1287,10 @@ func (s *genState) genValue(v *ssa.Value) []*Prog {
 		}
 	case ssa.OpConst8, ssa.OpConst16, ssa.OpConst32, ssa.OpConst64, ssa.OpConstString, ssa.OpConstNil, ssa.OpConstBool,
 		ssa.OpConst32F, ssa.OpConst64F:
+		fmt.Println("v.ID:", v.ID)
+		f := v.Block.Func
+		fmt.Println("f.RegAlloc:", f.RegAlloc)
+		fmt.Println("len(f.RegAlloc):", len(f.RegAlloc))
 		if v.Block.Func.RegAlloc[v.ID] != nil {
 			v.Fatalf("const value %v shouldn't have a location", v)
 		}

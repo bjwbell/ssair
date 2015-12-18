@@ -41,14 +41,14 @@ func main() {
 		*pkgName = filePath(file)
 	}
 
-	ssafn, ok := gossa.ParseSSA(file, *pkgName, *fn)
+	ssafn, ok := gossa.BuildSSA(file, *pkgName, *fn)
 	if ssafn == nil || !ok {
 		fmt.Println("Error building SSA form")
 		return
 	} else {
 		fmt.Println("ssa:\n", ssafn)
 	}
-	if fnProg, ok := gossa.GenSSA(ssafn); ok {
+	if fnProg, ok := gossa.GenProg(ssafn); ok {
 		assembly := gossa.Assemble(fnProg)
 		fmt.Println("assembly:\n", assembly)
 	} else {

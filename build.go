@@ -91,7 +91,7 @@ import (
 
 // ParseSSA parses the function, fn, which must be in ssa form and returns
 // the corresponding ssa.Func
-func ParseSSA(file, pkgName, fn string) (ssafn *ssa.Func, usessa bool) {
+func BuildSSA(file, pkgName, fn string) (ssafn *ssa.Func, usessa bool) {
 	var conf types.Config
 	conf.Importer = importer.Default()
 	/*conf.Error = func(err error) {
@@ -146,7 +146,7 @@ func ParseSSA(file, pkgName, fn string) (ssafn *ssa.Func, usessa bool) {
 		fmt.Println("couldn't find function: ", fn)
 		return
 	}
-	ssafn, ok = parseSSA(fileTok, fileAst, fnDecl, function, &info)
+	ssafn, ok = buildSSA(fileTok, fileAst, fnDecl, function, &info)
 	return ssafn, ok
 }
 
@@ -273,7 +273,7 @@ func getVars(ctx Ctx, fnDecl *ast.FuncDecl, fnType *types.Func) []ssaVar {
 	return vars
 }
 
-func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Func, fnInfo *types.Info) (ssafn *ssa.Func, ok bool) {
+func buildSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Func, fnInfo *types.Info) (ssafn *ssa.Func, ok bool) {
 
 	// HACK, hardcoded
 	arch := "amd64"
@@ -366,6 +366,8 @@ func parseSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	s.processBlocks()
 
 	fmt.Println("f:", f)
+
+	ssa.Compile(s.f)
 
 	return s.f, true
 }
