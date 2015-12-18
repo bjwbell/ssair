@@ -1442,9 +1442,6 @@ func (s *genState) genValue(v *ssa.Value) []*Prog {
 			Warnl(int(v.Line), "generated nil check")
 		}
 		progs = append(progs, p)
-	case ssa.OpAddr: // ignore
-		// TODO: handle correctly
-
 	default:
 		fmt.Println("unimplemented OP:", v.Op.String())
 		v.Unimplementedf("genValue not implemented: %s", v.LongString())
