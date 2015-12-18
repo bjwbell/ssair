@@ -23,11 +23,19 @@ var Debug_checknil int
 const minZeroPage = 4096
 
 func Warn(fmt_ string, args ...interface{}) {
-	fmt.Printf("Warning: "+fmt_, args)
+	if len(args) > 0 {
+		fmt.Printf("Warning: "+fmt_+"\n", args)
+	} else {
+		fmt.Printf("Warning: " + fmt_ + "\n")
+	}
 }
 
 func Warnl(line int, fmt_ string, args ...interface{}) {
-	fmt.Printf("Warning (line %v): "+fmt_+" ", line, args)
+	if len(args) > 0 {
+		fmt.Printf("Warning (line %v): "+fmt_+" \n", line, args)
+	} else {
+		fmt.Printf("Warning (line %v): "+fmt_+" \n", line)
+	}
 }
 
 // regnum returns the register (in cmd/internal/obj numbering) to
@@ -1295,78 +1303,14 @@ func (s *genState) genValue(v *ssa.Value) []*Prog {
 		// of the entry block.
 	case ssa.OpAMD64LoweredGetG:
 		panic("unimplementedf")
-		/*r := regnum(v)
-		// See the comments in cmd/internal/obj/x86/obj6.go
-		// near CanUse1InsnTLS for a detailed explanation of these instructions.
-		if x86.CanUse1InsnTLS(Ctxt) {
-			// MOVQ (TLS), r
-			p = CreateProg(x86.AMOVQ)
-			p.From.Type = TYPE_MEM
-			p.From.Reg = x86.REG_TLS
-			p.To.Type = TYPE_REG
-			p.To.Reg = r
-		} else {
-			// MOVQ TLS, r
-			// MOVQ (r)(TLS*1), r
-			p = CreateProg(x86.AMOVQ)
-			p.From.Type = TYPE_REG
-			p.From.Reg = x86.REG_TLS
-			p.To.Type = TYPE_REG
-			p.To.Reg = r
-			q := CreateProg(x86.AMOVQ)
-			q.From.Type = TYPE_MEM
-			q.From.Reg = r
-			q.From.Index = x86.REG_TLS
-			q.From.Scale = 1
-			q.To.Type = TYPE_REG
-			q.To.Reg = r
-		}*/
 	case ssa.OpAMD64CALLstatic:
 		panic("unimplementedf")
-		/*p = CreateProg(obj.ACALL)
-		p.To.Type = TYPE_MEM
-		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = Linksym(v.Aux.(*Sym))
-		if Maxarg < v.AuxInt {
-			Maxarg = v.AuxInt
-		}*/
 	case ssa.OpAMD64CALLclosure:
 		panic("unimplementedf")
-		/*p = CreateProg(obj.ACALL)
-		p.To.Type = TYPE_REG
-		p.To.Reg = regnum(v.Args[0])
-		if Maxarg < v.AuxInt {
-			Maxarg = v.AuxInt
-		}*/
 	case ssa.OpAMD64CALLdefer:
 		panic("unimplementedf")
-		/*p = CreateProg(obj.ACALL)
-		p.To.Type = TYPE_MEM
-		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = Linksym(Deferproc.Sym)
-		if Maxarg < v.AuxInt {
-			Maxarg = v.AuxInt
-		}
-		// defer returns in rax:
-		// 0 if we should continue executing
-		// 1 if we should jump to deferreturn call
-		p = CreateProg(x86.ATESTL)
-		p.From.Type = TYPE_REG
-		p.From.Reg = x86.REG_AX
-		p.To.Type = TYPE_REG
-		p.To.Reg = x86.REG_AX
-		p = CreateProg(x86.AJNE)
-		p.To.Type = TYPE_BRANCH
-		s.deferBranches = append(s.deferBranches, p)*/
 	case ssa.OpAMD64CALLgo:
 		panic("unimplementedf")
-		/*p = CreateProg(obj.ACALL)
-		p.To.Type = TYPE_MEM
-		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = Linksym(Newproc.Sym)
-		if Maxarg < v.AuxInt {
-			Maxarg = v.AuxInt
-		}*/
 	case ssa.OpAMD64CALLinter:
 		p = CreateProg(obj.ACALL)
 		p.To.Type = TYPE_REG
@@ -1494,9 +1438,14 @@ func (s *genState) genValue(v *ssa.Value) []*Prog {
 			Warnl(int(v.Line), "generated nil check")
 		}
 		progs = append(progs, p)
+	case ssa.OpAddr: // ignore
+		// TODO: handle correctly
+
 	default:
+		fmt.Println("unimplemented OP:", v.Op.String())
+		v.Unimplementedf("genValue not implemented: %s", v.LongString())
 		panic("unimplementedf")
-		//v.Unimplementedf("genValue not implemented: %s", v.LongString())
+
 	}
 	return progs
 }

@@ -44,7 +44,16 @@ func main() {
 	ssafn, ok := gossa.ParseSSA(file, *pkgName, *fn)
 	if ssafn == nil || !ok {
 		fmt.Println("Error building SSA form")
+		return
 	} else {
 		fmt.Println("ssa:\n", ssafn)
 	}
+	if fnProg, ok := gossa.GenSSA(ssafn); ok {
+		assembly := gossa.Assemble(fnProg)
+		fmt.Println("assembly:\n", assembly)
+	} else {
+		fmt.Println("Error generating prog from SSA")
+		return
+	}
+
 }
