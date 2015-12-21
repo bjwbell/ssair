@@ -251,7 +251,6 @@ var aSpace []opSet
 
 func init() {
 	RegisterRegister(x86.REG_AL, x86.REG_AL+len(x86.Register), x86.Rconv)
-
 	RegisterOpcode(obj.ABaseAMD64, x86.Anames)
 }
 
