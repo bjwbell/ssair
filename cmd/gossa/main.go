@@ -27,6 +27,7 @@ func main() {
 	var pkgName = flag.String("pkg", "", "input file package name")
 	var f = flag.String("f", "", "input file with function definitions")
 	var fn = flag.String("fn", "", "function name")
+	var logArg = flag.Bool("log", false, "enable logging for the ssa package")
 	flag.Parse()
 
 	file := os.ExpandEnv("$GOFILE")
@@ -41,7 +42,7 @@ func main() {
 		*pkgName = filePath(file)
 	}
 
-	ssafn, ok := gossa.BuildSSA(file, *pkgName, *fn)
+	ssafn, ok := gossa.BuildSSA(file, *pkgName, *fn, *logArg)
 	if ssafn == nil || !ok {
 		fmt.Println("Error building SSA form")
 		return
