@@ -185,6 +185,28 @@ func (p ssaParam) Typ() ssa.Type {
 	return &Type{p.v.Type()}
 }
 
+type ssaRetVar struct {
+	ssaVar
+	v   *types.Var
+	ctx Ctx
+}
+
+func (p *ssaRetVar) Name() string {
+	return p.v.Name()
+}
+
+func (p ssaRetVar) String() string {
+	return fmt.Sprintf("{ssaRetVar: %v}", p.Name())
+}
+
+func (p *ssaRetVar) Class() NodeClass {
+	return PPARAMOUT
+}
+
+func (p ssaRetVar) Typ() ssa.Type {
+	return &Type{p.v.Type()}
+}
+
 type ssaLocal struct {
 	ssaVar
 	obj types.Object
@@ -221,6 +243,20 @@ func getParameters(ctx Ctx, fn *types.Func) []*ssaParam {
 	return params
 }
 
+func getReturnVar(ctx Ctx, fn *types.Func) []*ssaRetVar {
+	signature := fn.Type().(*types.Signature)
+	if signature.Recv() != nil {
+		panic("methods unsupported (only functions are supported)")
+	}
+	var results []*ssaRetVar
+	for i := 0; i < signature.Results().Len(); i++ {
+		ret := signature.Results().At(i)
+		n := ssaRetVar{v: ret, ctx: ctx}
+		results = append(results, &n)
+	}
+	return results
+}
+
 func linenum(f *token.File, p token.Pos) int32 {
 	return int32(f.Line(p))
 }
@@ -255,16 +291,34 @@ func getVars(ctx Ctx, fnDecl *ast.FuncDecl, fnType *types.Func) []ssaVar {
 	var vars []ssaVar
 	params := getParameters(ctx, fnType)
 	locals := getLocalDecls(ctx, fnDecl, fnType)
+	results := getReturnVar(ctx, fnType)
 	for _, p := range params {
 		for _, local := range locals {
-			if p.Name() == local.Name() {
-				fmt.Printf("p.Name(): %v, local.Name(): %v\n", p.Name(), local.Name())
-				panic("param and local with same name")
+			for _, ret := range results {
+				if p.Name() == local.Name() {
+					fmt.Printf("p.Name(): %v, local.Name(): %v\n", p.Name(), local.Name())
+					panic("param and local with same name")
+				}
+
+				if p.Name() == ret.Name() {
+					fmt.Printf("p.Name(): %v, ret.Name(): %v\n", p.Name(), ret.Name())
+					panic("param and result value with same name")
+				}
+
+				if local.Name() == ret.Name() {
+					fmt.Printf("local.Name(): %v, ret.Name(): %v\n", local.Name(), ret.Name())
+					panic("local and result value with same name")
+				}
 			}
+
 		}
 	}
 	for _, p := range params {
 		vars = append(vars, p)
+	}
+
+	for _, r := range results {
+		vars = append(vars, r)
 	}
 
 	for _, local := range locals {
@@ -330,12 +384,12 @@ func buildSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	for _, v := range vars {
 		switch v.Class() {
 		case PPARAM:
-			//aux := s.lookupSymbol(n, &ssa.ArgSymbol{Typ: n.Type, Node: n})
-			//s.decladdrs[n] = s.entryNewValue1A(ssa.OpAddr, Ptrto(n.Type), aux, s.sp)
+			// aux := s.lookupSymbol(n, &ssa.ArgSymbol{Typ: n.Type, Node: n})
+			// s.decladdrs[n] = s.entryNewValue1A(ssa.OpAddr, Ptrto(n.Type), aux, s.sp)
 		case PAUTO | PHEAP:
 			// TODO this looks wrong for PAUTO|PHEAP, no vardef, but also no definition
-			//aux := s.lookupSymbol(n, &ssa.AutoSymbol{Typ: n.Type, Node: n})
-			//s.decladdrs[n] = s.entryNewValue1A(ssa.OpAddr, Ptrto(n.Type), aux, s.sp)
+			// aux := s.lookupSymbol(n, &ssa.AutoSymbol{Typ: n.Type, Node: n})
+			// s.decladdrs[n] = s.entryNewValue1A(ssa.OpAddr, Ptrto(n.Type), aux, s.sp)
 		case PPARAM | PHEAP, PPARAMOUT | PHEAP:
 		// This ends up wrong, have to do it at the PARAM node instead.
 		case PAUTO, PPARAMOUT:

@@ -249,6 +249,12 @@ type opSet struct {
 // Not even worth sorting
 var aSpace []opSet
 
+func init() {
+	RegisterRegister(x86.REG_AL, x86.REG_AL+len(x86.Register), x86.Rconv)
+
+	RegisterOpcode(obj.ABaseAMD64, x86.Anames)
+}
+
 // RegisterOpcode binds a list of instruction names
 // to a given instruction number range.
 func RegisterOpcode(lo int, Anames []string) {

@@ -81,6 +81,29 @@ type state struct {
 	//labledBlocks    map[string]*ssa.Block
 }
 
+func (s *state) retVar() *ssaRetVar {
+	retVars := getReturnVar(s.ctx, s.fnType)
+	if len(retVars) > 1 {
+		panic("more than one return value is unsupported")
+	}
+	if len(retVars) == 0 {
+		return nil
+	}
+	ret := retVars[0]
+	if ret == nil {
+		panic("nil ret var")
+	}
+	return ret
+}
+
+func (s *state) retVarAddr() *ssa.Value {
+	ret := s.retVar()
+	retSym := &ssa.ArgSymbol{Typ: ret.Typ(), Node: ret}
+	aux := retSym
+	retVarAddr := s.entryNewValue1A(ssa.OpAddr, ret.Typ().PtrTo(), aux, s.sp)
+	return retVarAddr
+}
+
 func (s *state) label(ident *ast.Ident) *ssaLabel {
 	lab := s.labels[ident.Name]
 	if lab == nil {
@@ -600,8 +623,11 @@ func (s *state) stmt(block *Block, stmt ast.Stmt) {
 		}
 		if len(stmt.Results) == 1 {
 			res := stmt.Results[0]
-			v := s.expr(NewNode(res, s.ctx))
-			s.vars[&memVar] = v
+			node := NewNode(res, s.ctx)
+			t := node.Typ()
+			v := s.expr(node)
+			addr := s.retVarAddr()
+			s.vars[&memVar] = s.newValue3I(ssa.OpStore, ssa.TypeMem, t.Size(), addr, v, s.mem())
 		}
 		m := s.mem()
 		block.b.Kind = ssa.BlockRet
@@ -1262,6 +1288,10 @@ func (s *state) assignStmt(stmt *ast.AssignStmt) {
 }
 
 func canSSA(n *Node) bool {
+	switch n.Class() {
+	case PEXTERN, PPARAMOUT, PPARAMREF:
+		return false
+	}
 	return true
 }
 

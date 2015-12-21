@@ -10,6 +10,7 @@ import (
 type Node struct {
 	node  ast.Node
 	ctx   Ctx
+	Var   ssaVar
 	class NodeClass
 }
 
@@ -36,6 +37,13 @@ func (n *Node) Name() string {
 		return node.Name
 	}
 	panic("unandled case for node.Name")
+}
+
+func (n *Node) Class() NodeClass {
+	if n.Var != nil {
+		return n.Var.Class()
+	}
+	return n.class
 }
 
 type NodeClass uint8
