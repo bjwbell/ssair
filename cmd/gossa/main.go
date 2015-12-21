@@ -50,7 +50,8 @@ func main() {
 	}
 	if fnProg, ok := gossa.GenProg(ssafn); ok {
 		assembly := gossa.Assemble(fnProg)
-		fmt.Println("assembly:\n", assembly)
+		fmt.Println("assembly:")
+		fmt.Println(assembly)
 	} else {
 		fmt.Println("Error generating prog from SSA")
 		return
