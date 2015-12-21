@@ -556,6 +556,17 @@ type genState struct {
 	deferTarget *Prog
 }
 
+func AssemblyFilePreamble() string {
+	preamble := "// +build amd64 !noasm !appengine\n\n"
+	preamble += "#include \"textflag.h\"\n\n"
+	return preamble
+}
+
+func FuncProto(name string, frameSize, argsSize int) string {
+	a := fmt.Sprintf("TEXT ·%v(SB),$%v-%v", name, frameSize, argsSize)
+	return a
+}
+
 func Assemble(fn []*Prog) (assembly string) {
 	assembly = ""
 	for _, p := range fn {
