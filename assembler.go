@@ -206,7 +206,7 @@ func (p *Prog) From3Offset() int64 {
 }
 
 func (p *Prog) Line() string {
-	return "<Prog.Line()>" //p.Ctxt.LineHist.LineString(int(p.Lineno))
+	return fmt.Sprintf("Line:%d", p.Lineno)
 }
 
 const (
@@ -699,7 +699,7 @@ func CreateProg(as int) *Prog {
 	}
 
 	if lineno == 0 {
-		Warn("prog: line 0")
+		Warn("prog: line num (0) not set")
 	}
 
 	p.As = int16(as)
