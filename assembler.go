@@ -555,7 +555,7 @@ type genState struct {
 	deferTarget *Prog
 }
 
-func AssemblyFilePreamble() string {
+func Preamble() string {
 	preamble := "// +build amd64 !noasm !appengine\n\n"
 	preamble += "#include \"textflag.h\"\n\n"
 	return preamble

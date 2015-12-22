@@ -89,38 +89,31 @@ import (
 // 	return true
 // }
 
-// ParseSSA parses the function, fn, which must be in ssa form and returns
-// the corresponding ssa.Func
-func BuildSSA(file, pkgName, fn string, log bool) (ssafn *ssa.Func, usessa bool) {
+func TypeCheckFn(file, pkgName, fn string, log bool) (fileTok *token.File, fileAst *ast.File, fnDecl *ast.FuncDecl, function *types.Func, info *types.Info) {
 	var conf types.Config
 	conf.Importer = importer.Default()
-	/*conf.Error = func(err error) {
-		fmt.Println("terror:", err)
-	}*/
 	fset := token.NewFileSet()
 	fileAst, err := parser.ParseFile(fset, file, nil, parser.AllErrors)
-	fileTok := fset.File(fileAst.Pos())
+	fileTok = fset.File(fileAst.Pos())
 	var terrors string
 	if err != nil {
 		fmt.Printf("Error parsing %v, error message: %v\n", file, err)
 		terrors += fmt.Sprintf("err: %v\n", err)
 		return
 	}
-
 	files := []*ast.File{fileAst}
-	info := types.Info{
+	info = &types.Info{
 		Types: make(map[ast.Expr]types.TypeAndValue),
 		Defs:  make(map[*ast.Ident]types.Object),
 		Uses:  make(map[*ast.Ident]types.Object),
 	}
-	pkg, err := conf.Check(pkgName, fset, files, &info)
+	pkg, err := conf.Check(pkgName, fset, files, info)
 	if err != nil {
 		if terrors != fmt.Sprintf("err: %v\n", err) {
 			fmt.Printf("Type error (%v) message: %v\n", file, err)
 			return
 		}
 	}
-
 	fmt.Println("pkg: ", pkg)
 	fmt.Println("pkg.Complete:", pkg.Complete())
 	scope := pkg.Scope()
@@ -133,7 +126,6 @@ func BuildSSA(file, pkgName, fn string, log bool) (ssafn *ssa.Func, usessa bool)
 	if !ok {
 		fmt.Printf("%v is a %v, not a function\n", fn, obj.Type().String())
 	}
-	var fnDecl *ast.FuncDecl
 	for _, decl := range fileAst.Decls {
 		if fdecl, ok := decl.(*ast.FuncDecl); ok {
 			if fdecl.Name.Name == fn {
@@ -146,7 +138,14 @@ func BuildSSA(file, pkgName, fn string, log bool) (ssafn *ssa.Func, usessa bool)
 		fmt.Println("couldn't find function: ", fn)
 		return
 	}
-	ssafn, ok = buildSSA(fileTok, fileAst, fnDecl, function, &info, log)
+	return
+}
+
+// ParseSSA parses the function, fn, which must be in ssa form and returns
+// the corresponding ssa.Func
+func BuildSSA(file, pkgName, fn string, log bool) (ssafn *ssa.Func, usessa bool) {
+	fileTok, fileAst, fnDecl, function, info := TypeCheckFn(file, pkgName, fn, log)
+	ssafn, ok := buildSSA(fileTok, fileAst, fnDecl, function, info, log)
 	return ssafn, ok
 }
 
