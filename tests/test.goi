@@ -1,4 +1,4 @@
-package main
+package tests
 
 func t0() {
 	return
