@@ -89,18 +89,19 @@ import (
 // 	return true
 // }
 
-func TypeCheckFn(file, pkgName, fn string, log bool) (fileTok *token.File, fileAst *ast.File, fnDecl *ast.FuncDecl, function *types.Func, info *types.Info) {
+func TypeCheckFn(file, pkgName, fn string, log bool) (fileTok *token.File, fileAst *ast.File, fnDecl *ast.FuncDecl, function *types.Func, info *types.Info, er error) {
 	var conf types.Config
 	conf.Importer = importer.Default()
 	fset := token.NewFileSet()
 	fileAst, err := parser.ParseFile(fset, file, nil, parser.AllErrors)
-	fileTok = fset.File(fileAst.Pos())
 	var terrors string
 	if err != nil {
 		fmt.Printf("Error parsing %v, error message: %v\n", file, err)
 		terrors += fmt.Sprintf("err: %v\n", err)
+		er = err
 		return
 	}
+	fileTok = fset.File(fileAst.Pos())
 	files := []*ast.File{fileAst}
 	info = &types.Info{
 		Types: make(map[ast.Expr]types.TypeAndValue),
@@ -111,6 +112,7 @@ func TypeCheckFn(file, pkgName, fn string, log bool) (fileTok *token.File, fileA
 	if err != nil {
 		if terrors != fmt.Sprintf("err: %v\n", err) {
 			fmt.Printf("Type error (%v) message: %v\n", file, err)
+			er = err
 			return
 		}
 	}
@@ -120,11 +122,14 @@ func TypeCheckFn(file, pkgName, fn string, log bool) (fileTok *token.File, fileA
 	obj := scope.Lookup(fn)
 	if obj == nil {
 		fmt.Println("Couldnt lookup function: ", fn)
+		er = fmt.Errorf("Couldnt lookup function: %v", fn)
 		return
 	}
 	function, ok := obj.(*types.Func)
 	if !ok {
 		fmt.Printf("%v is a %v, not a function\n", fn, obj.Type().String())
+		er = fmt.Errorf("%v is a %v, not a function\n", fn, obj.Type().String())
+		return
 	}
 	for _, decl := range fileAst.Decls {
 		if fdecl, ok := decl.(*ast.FuncDecl); ok {
@@ -136,6 +141,7 @@ func TypeCheckFn(file, pkgName, fn string, log bool) (fileTok *token.File, fileA
 	}
 	if fnDecl == nil {
 		fmt.Println("couldn't find function: ", fn)
+		er = fmt.Errorf("couldn't find function: %v", fn)
 		return
 	}
 	return
@@ -144,7 +150,10 @@ func TypeCheckFn(file, pkgName, fn string, log bool) (fileTok *token.File, fileA
 // ParseSSA parses the function, fn, which must be in ssa form and returns
 // the corresponding ssa.Func
 func BuildSSA(file, pkgName, fn string, log bool) (ssafn *ssa.Func, usessa bool) {
-	fileTok, fileAst, fnDecl, function, info := TypeCheckFn(file, pkgName, fn, log)
+	fileTok, fileAst, fnDecl, function, info, err := TypeCheckFn(file, pkgName, fn, log)
+	if err != nil {
+		return nil, false
+	}
 	ssafn, ok := buildSSA(fileTok, fileAst, fnDecl, function, info, log)
 	return ssafn, ok
 }
