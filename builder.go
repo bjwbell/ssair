@@ -169,6 +169,7 @@ type ssaVar interface {
 	Class() NodeClass
 	String() string
 	Typ() ssa.Type
+	Xoffset() int64
 }
 
 type ssaParam struct {
@@ -189,6 +190,11 @@ func (p *ssaParam) Class() NodeClass {
 	return PPARAM
 }
 
+func (p *ssaParam) Xoffset() int64 {
+	// TODO
+	return 0
+}
+
 func (p ssaParam) Typ() ssa.Type {
 	return &Type{p.v.Type()}
 }
@@ -200,7 +206,12 @@ type ssaRetVar struct {
 }
 
 func (p *ssaRetVar) Name() string {
-	return p.v.Name()
+	name := p.v.Name()
+	if name == "" {
+		name = "ret0"
+	}
+	fmt.Println("SSARETVAR.NAME(): ", name)
+	return name
 }
 
 func (p ssaRetVar) String() string {
@@ -208,7 +219,13 @@ func (p ssaRetVar) String() string {
 }
 
 func (p *ssaRetVar) Class() NodeClass {
-	return PPARAMOUT
+	// return PPARAMOUT
+	return PPARAM
+}
+
+func (p *ssaRetVar) Xoffset() int64 {
+	// TODO
+	return 8
 }
 
 func (p ssaRetVar) Typ() ssa.Type {
@@ -231,6 +248,11 @@ func (local ssaLocal) String() string {
 
 func (local *ssaLocal) Class() NodeClass {
 	return PAUTO
+}
+
+func (local *ssaLocal) Xoffset() int64 {
+	// TODO
+	return 0
 }
 
 func (local ssaLocal) Typ() ssa.Type {

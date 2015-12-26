@@ -348,6 +348,7 @@ func Dconv(p *Prog, a *Addr) string {
 		str = Mconv(a)
 		if a.Index != REG_NONE {
 			str += fmt.Sprintf("(%v*%d)", Rconv(int(a.Index)), int(a.Scale))
+			panic("unexpected")
 		}
 
 	case TYPE_CONST:
@@ -1211,6 +1212,7 @@ func (s *genState) genValue(v *ssa.Value) []*Prog {
 		p.From.Offset = i
 		p.To.Type = TYPE_MEM
 		p.To.Reg = regnum(v.Args[0])
+		fmt.Println("P.TO.REG:", Rconv(int(p.To.Reg)))
 		addAux2(&p.To, v, sc.Off())
 		progs = append(progs, p)
 	case ssa.OpAMD64MOVLQSX, ssa.OpAMD64MOVWQSX, ssa.OpAMD64MOVBQSX, ssa.OpAMD64MOVLQZX, ssa.OpAMD64MOVWQZX, ssa.OpAMD64MOVBQZX,
@@ -1258,12 +1260,12 @@ func (s *genState) genValue(v *ssa.Value) []*Prog {
 		p.From.Node = n
 		//p.From.Sym = Linksym(n.Sym)
 		p.From.Offset = off
-		/*if n.Class == PPARAM {
-			p.From.Name = obj.NAME_PARAM
-			p.From.Offset += n.Xoffset
+		if n.Class() == PPARAM {
+			p.From.Name = NAME_PARAM
+			p.From.Offset += n.Xoffset()
 		} else {
-			p.From.Name = obj.NAME_AUTO
-		}*/
+			p.From.Name = NAME_AUTO
+		}
 		p.To.Type = TYPE_REG
 		p.To.Reg = regnum(v)
 		progs = append(progs, p)
@@ -1281,12 +1283,12 @@ func (s *genState) genValue(v *ssa.Value) []*Prog {
 		p.To.Node = n
 		//p.To.Sym = Linksym(n.Sym)
 		p.To.Offset = off
-		/*if n.Class == PPARAM {
-			p.To.Name = obj.NAME_PARAM
-			p.To.Offset += n.Xoffset
+		if n.Class() == PPARAM {
+			p.To.Name = NAME_PARAM
+			p.To.Offset += n.Xoffset()
 		} else {
-			p.To.Name = obj.NAME_AUTO
-		}*/
+			p.To.Name = NAME_AUTO
+		}
 		progs = append(progs, p)
 	case ssa.OpPhi:
 		// just check to make sure regalloc and stackalloc did it right
@@ -1677,24 +1679,25 @@ func addAux2(a *Addr, v *ssa.Value, offset int64) {
 		return
 	}
 	// Add symbol's offset from its base register.
-	/*switch sym := v.Aux.(type) {
+	switch sym := v.Aux.(type) {
 	case *ssa.ExternSymbol:
-		a.Name = obj.NAME_EXTERN
-		a.Sym = Linksym(sym.Sym.(*Sym))
+		a.Name = NAME_EXTERN
+		//a.Sym = Linksym(sym.Sym.(*Sym))
 	case *ssa.ArgSymbol:
-		n := sym.Node.(*Node)
-		a.Name = obj.NAME_PARAM
+		n := sym.Node.(ssaVar)
+		a.Name = NAME_PARAM
 		a.Node = n
-		a.Sym = Linksym(n.Orig.Sym)
-		a.Offset += n.Xoffset // TODO: why do I have to add this here?  I don't for auto variables.
+		a.Sym = &LSym{} //Linksym(n.Orig.Sym)
+		a.Sym.Name = n.Name()
+		a.Offset += n.Xoffset() // TODO: why do I have to add this here?  I don't for auto variables.
 	case *ssa.AutoSymbol:
-		n := sym.Node.(*Node)
-		a.Name = obj.NAME_AUTO
+		n := sym.Node.(ssaVar)
+		a.Name = NAME_AUTO
 		a.Node = n
-		a.Sym = Linksym(n.Sym)
+		//a.Sym = Linksym(n.Sym)
 	default:
 		v.Fatalf("aux in %s not implemented %#v", v, v.Aux)
-	}*/
+	}
 }
 
 // ssaRegToReg maps ssa register numbers to obj register numbers.

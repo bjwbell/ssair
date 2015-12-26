@@ -46,6 +46,14 @@ func (n *Node) Class() NodeClass {
 	return n.class
 }
 
+func (n *Node) Xoffset() int64 {
+	if n.Var != nil {
+		return n.Var.Xoffset()
+	} else {
+		return 8
+	}
+}
+
 type NodeClass uint8
 
 // declaration context
