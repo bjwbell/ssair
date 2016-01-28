@@ -147,7 +147,7 @@ func TypeCheckFn(file, pkgName, fn string, log bool) (fileTok *token.File, fileA
 	return
 }
 
-// ParseSSA parses the function, fn, which must be in ssa form and returns
+// BuildSSA parses the function, fn, which must be in ssa form and returns
 // the corresponding ssa.Func
 func BuildSSA(file, pkgName, fn string, log bool) (ssafn *ssa.Func, usessa bool) {
 	fileTok, fileAst, fnDecl, function, info, err := TypeCheckFn(file, pkgName, fn, log)
@@ -436,9 +436,6 @@ func buildSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 		}
 	}
 
-	//fnType.Pkg()
-	//
-
 	fpVar := types.NewVar(0, fnType.Pkg(), ".fp", Typ[types.Int32].Type)
 	nodfp := &ssaParam{v: fpVar, ctx: s.ctx}
 
@@ -446,7 +443,6 @@ func buildSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	aux := &ssa.ArgSymbol{Typ: Typ[types.Uintptr], Node: nodfp}
 	s.decladdrs[nodfp] = s.entryNewValue1A(ssa.OpAddr, Typ[types.Uintptr], aux, s.sp)
 
-	//s.body(fn.Body)
 	s.processBlocks()
 
 	fmt.Println("f:", f)

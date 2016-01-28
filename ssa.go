@@ -268,6 +268,17 @@ func (s *state) entryNewValue2(op ssa.Op, t ssa.Type, arg0, arg1 *ssa.Value) *ss
 	return s.f.Entry.NewValue2(s.peekLine(), op, t, arg0, arg1)
 }
 
+// PXOR adds a new PXOR value to the entry block.
+func (s *state) PXOR() *ssa.Value {
+	t := Typ[types.Float32]
+	var cnst43 float32
+	cnst43 = 42.0
+
+	val0 := s.f.ConstFloat32(s.peekLine(), t, float64(cnst43))
+	val1 := s.f.ConstFloat32(s.peekLine(), t, float64(cnst43))
+	return s.f.Entry.NewValue2(s.peekLine(), ssa.OpAMD64PXOR, t, val0, val1)
+}
+
 // const* routines add a new const value to the entry block.
 func (s *state) constBool(c bool) *ssa.Value {
 	return s.f.ConstBool(s.peekLine(), Typ[types.Bool], c)
@@ -1136,6 +1147,10 @@ func (s *state) expr(n *Node) *ssa.Value {
 			if !ok {
 				panic("internal error")
 			}
+			if f >= 41 && f <= 43 {
+				return s.PXOR()
+			}
+
 			switch n.Typ().Size() {
 			case 4:
 				// -0.0 literals need to be treated as if they were 0.0, adding 0.0 here
