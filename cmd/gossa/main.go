@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bjwbell/gossa"
+	"github.com/bjwbell/ssair"
 )
 
 func filePath(pathName string) string {
@@ -45,24 +45,24 @@ func main() {
 		*pkgName = filePath(file)
 	}
 
-	ssafn, ok := gossa.BuildSSA(file, *pkgName, *fn, *logging)
+	ssafn, ok := ssair.BuildSSA(file, *pkgName, *fn, *logging)
 	if ssafn == nil || !ok {
 		fmt.Println("Error building SSA form")
 		return
 	} else {
 		fmt.Println("ssa:\n", ssafn)
 	}
-	_, _, _, fnType, _, err := gossa.TypeCheckFn(file, *pkgName, *fn, *logging)
+	_, _, _, fnType, _, err := ssair.TypeCheckFn(file, *pkgName, *fn, *logging)
 	if err != nil {
 		fmt.Println("ERROR TYPE CHECKING FN")
 		return
 	}
-	_, protoImports, protoFn := gossa.GoProto(fnType)
+	_, protoImports, protoFn := ssair.GoProto(fnType)
 
-	if fnProg, ok := gossa.GenProg(ssafn); ok {
-		preamble := gossa.Preamble()
-		assembly := gossa.Assemble(fnProg)
-		fnProto := gossa.FuncProto(ssafn.Name, 0, 0)
+	if fnProg, ok := ssair.GenProg(ssafn); ok {
+		preamble := ssair.Preamble()
+		assembly := ssair.Assemble(fnProg)
+		fnProto := ssair.FuncProto(ssafn.Name, 0, 0)
 		fmt.Println("assembly:")
 		fmt.Println(fnProto)
 		fmt.Println(assembly)
