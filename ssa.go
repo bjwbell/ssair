@@ -1147,9 +1147,6 @@ func (s *state) expr(n *Node) *ssa.Value {
 			if !ok {
 				panic("internal error")
 			}
-			if f >= 41 && f <= 43 {
-				return s.PXOR()
-			}
 
 			switch n.Typ().Size() {
 			case 4:
