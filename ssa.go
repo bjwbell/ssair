@@ -269,14 +269,14 @@ func (s *state) entryNewValue2(op ssa.Op, t ssa.Type, arg0, arg1 *ssa.Value) *ss
 }
 
 // PXOR adds a new PXOR value to the entry block.
-func (s *state) PXOR() *ssa.Value {
+func (s *state) PXOR(b *ssa.Block) *ssa.Value {
 	t := Typ[types.Float32]
 	var cnst43 float32
 	cnst43 = 42.0
 
 	val0 := s.f.ConstFloat32(s.peekLine(), t, float64(cnst43))
 	val1 := s.f.ConstFloat32(s.peekLine(), t, float64(cnst43))
-	return s.f.Entry.NewValue2(s.peekLine(), ssa.OpAMD64PXOR, t, val0, val1)
+	return b.NewValue2(s.peekLine(), ssa.OpAMD64PXOR, t, val0, val1)
 }
 
 // const* routines add a new const value to the entry block.
@@ -612,7 +612,25 @@ func (s *state) stmt(block *Block, stmt ast.Stmt) {
 		//panic(fmt.Sprintf("todo ast.DeclStmt: %#v", stmt))
 	case *ast.EmptyStmt: // No op
 	case *ast.ExprStmt:
-		panic("todo ast.ExprStmt: " + fmt.Sprintf("%#v", stmt))
+		expr := stmt.X
+		switch expr := expr.(type) {
+		case *ast.CallExpr:
+			callexpr := expr
+			fn, ok := callexpr.Fun.(*ast.SelectorExpr)
+			if ok {
+				fnPkg := fmt.Sprintf("%v", fn.X)
+				fnName := fmt.Sprintf("%v", fn.Sel)
+				if fnPkg == "ssair" && fnName == "Op2" {
+					s.PXOR(block.b)
+				} else {
+					panic("call expr not implemented: fnPkg - " + fnPkg + ", fnName - " + fnName + ", " + fmt.Sprintf("%#v", expr))
+				}
+			} else {
+				panic("call expr not implemented")
+			}
+		default:
+			panic("default expr not implemented")
+		}
 	case *ast.IfStmt:
 		condIdent, yes, no, err := s.matchIfStmt(stmt)
 		if err != nil {

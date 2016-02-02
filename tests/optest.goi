@@ -9,6 +9,8 @@ func opt0() {
 
 func opt1() float32 {
         var src, dst float32
+        src = 1.0
+        dst = 3.0
         ssair.Op2(ssa.OpAMD64PXOR, &src, &dst)
 	return dst
 }
