@@ -612,7 +612,7 @@ func (s *state) stmt(block *Block, stmt ast.Stmt) {
 		//panic(fmt.Sprintf("todo ast.DeclStmt: %#v", stmt))
 	case *ast.EmptyStmt: // No op
 	case *ast.ExprStmt:
-		panic("todo ast.ExprStmt")
+		panic("todo ast.ExprStmt: " + fmt.Sprintf("%#v", stmt))
 	case *ast.IfStmt:
 		condIdent, yes, no, err := s.matchIfStmt(stmt)
 		if err != nil {
