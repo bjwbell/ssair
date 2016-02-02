@@ -445,6 +445,9 @@ func buildSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 
 	s.processBlocks()
 
+	// Link up variable uses to variable definitions
+	s.linkForwardReferences()
+
 	fmt.Println("f:", f)
 
 	ssa.Compile(s.f)
