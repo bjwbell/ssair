@@ -4,8 +4,8 @@ func t0() {
 	return
 }
 
-func t1() float32 {
-	return 42.5
+func t1() int {
+	return 1
 }
 
 func t2() int {

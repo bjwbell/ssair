@@ -699,6 +699,128 @@ func (s *state) mem() *ssa.Value {
 	return s.variable(&memVar, ssa.TypeMem)
 }
 
+func (s *state) linkForwardReferences() {
+	// Build ssa graph.  Each variable on its first use in a basic block
+	// leaves a FwdRef in that block representing the incoming value
+	// of that variable.  This function links that ref up with possible definitions,
+	// inserting Phi values as needed.  This is essentially the algorithm
+	// described by Brau, Buchwald, Hack, Leißa, Mallon, and Zwinkau:
+	// http://pp.info.uni-karlsruhe.de/uploads/publikationen/braun13cc.pdf
+	for _, b := range s.f.Blocks {
+		for _, v := range b.Values {
+			if v.Op != ssa.OpFwdRef {
+				continue
+			}
+			name := v.Aux.(*Node)
+			v.Op = ssa.OpCopy
+			v.Aux = nil
+			v.SetArgs1(s.lookupVarIncoming(b, v.Type, name))
+		}
+	}
+}
+
+// lookupVarIncoming finds the variable's value at the start of block b.
+func (s *state) lookupVarIncoming(b *ssa.Block, t ssa.Type, name *Node) *ssa.Value {
+	// TODO(khr): have lookupVarIncoming overwrite the fwdRef or copy it
+	// will be used in, instead of having the result used in a copy value.
+	if b == s.f.Entry {
+		return nil
+		// if name == &memVar {
+		// 	return s.startmem
+		// }
+		// if canSSA(name) {
+		// 	v := s.entryNewValue0A(ssa.OpArg, t, name)
+		// 	// v starts with AuxInt == 0.
+		// 	s.addNamedValue(name, v)
+		// 	return v
+		// }
+		// // variable is live at the entry block.  Load it.
+		// addr := s.decladdrs[name]
+		// if addr == nil {
+		// 	// TODO: closure args reach here.
+		// 	s.Unimplementedf("unhandled closure arg %s at entry to function %s", name, b.Func.Name)
+		// }
+		// if _, ok := addr.Aux.(*ssa.ArgSymbol); !ok {
+		// 	s.Fatalf("variable live at start of function %s is not an argument %s", b.Func.Name, name)
+		// }
+		// return s.entryNewValue2(ssa.OpLoad, t, addr, s.startmem)
+	}
+	var vals []*ssa.Value
+	for _, p := range b.Preds {
+		vals = append(vals, s.lookupVarOutgoing(p, t, name))
+	}
+	if len(vals) == 0 {
+		// This block is dead; we have no predecessors and we're not the entry block.
+		// It doesn't matter what we use here as long as it is well-formed,
+		// so use the default/zero value.
+		return nil
+		// if name == &memVar {
+		// 	return s.startmem
+		// }
+		// return s.zeroVal(name.Type)
+	}
+	v0 := vals[0]
+	for i := 1; i < len(vals); i++ {
+		if vals[i] != v0 {
+			// need a phi value
+			v := b.NewValue0(s.peekLine(), ssa.OpPhi, t)
+			v.AddArgs(vals...)
+			s.addNamedValue(name, v)
+			return v
+		}
+	}
+	return v0
+}
+
+// lookupVarOutgoing finds the variable's value at the end of block b.
+func (s *state) lookupVarOutgoing(b *ssa.Block, t ssa.Type, name *Node) *ssa.Value {
+	return nil
+	// m := s.defvars[b.ID]
+	// if v, ok := m[name]; ok {
+	// 	return v
+	// }
+	// // The variable is not defined by b and we haven't
+	// // looked it up yet.  Generate v, a copy value which
+	// // will be the outgoing value of the variable.  Then
+	// // look up w, the incoming value of the variable.
+	// // Make v = copy(w).  We need the extra copy to
+	// // prevent infinite recursion when looking up the
+	// // incoming value of the variable.
+	// v := b.NewValue0(s.peekLine(), ssa.OpCopy, t)
+	// m[name] = v
+	// v.AddArg(s.lookupVarIncoming(b, t, name))
+	// return v
+}
+
+// TODO: the above mutually recursive functions can lead to very deep stacks.  Fix that.
+
+func (s *state) addNamedValue(n *Node, v *ssa.Value) {
+	if n.class == Pxxx {
+		// Don't track our dummy nodes (&memVar etc.).
+		return
+	}
+	if v == nil {
+		panic("nil *ssa.Value")
+	}
+	if v.Type == nil {
+		panic("nil v.Type (*ssa.Value)")
+	}
+	if n.class == PAUTO && (v.Type.IsString() || v.Type.IsSlice() || v.Type.IsInterface()) {
+		// TODO: can't handle auto compound objects with pointers yet.
+		return
+	}
+	// if n.Class == PAUTO && n.Xoffset != 0 {
+	// 	s.Fatalf("AUTO var with offset %s %d", n, n.Xoffset)
+	// }
+
+	loc := ssa.LocalSlot{N: n, Type: n.Typ(), Off: 0}
+	values, ok := s.f.NamedValues[loc]
+	if !ok {
+		s.f.Names = append(s.f.Names, loc)
+	}
+	s.f.NamedValues[loc] = append(values, v)
+}
+
 type opAndType struct {
 	op  NodeOp
 	typ types.BasicKind
@@ -1323,33 +1445,6 @@ func canSSA(n *Node) bool {
 		return false
 	}
 	return true
-}
-
-func (s *state) addNamedValue(n *Node, v *ssa.Value) {
-	if n.class == Pxxx {
-		// Don't track our dummy nodes (&memVar etc.).
-		return
-	}
-	if v == nil {
-		panic("nil *ssa.Value")
-	}
-	if v.Type == nil {
-		panic("nil v.Type (*ssa.Value)")
-	}
-	if n.class == PAUTO && (v.Type.IsString() || v.Type.IsSlice() || v.Type.IsInterface()) {
-		// TODO: can't handle auto compound objects with pointers yet.
-		return
-	}
-	// if n.Class == PAUTO && n.Xoffset != 0 {
-	// 	s.Fatalf("AUTO var with offset %s %d", n, n.Xoffset)
-	// }
-
-	loc := ssa.LocalSlot{N: n, Type: n.Typ(), Off: 0}
-	values, ok := s.f.NamedValues[loc]
-	if !ok {
-		s.f.Names = append(s.f.Names, loc)
-	}
-	s.f.NamedValues[loc] = append(values, v)
 }
 
 // zeroVal returns the zero value for type t.
