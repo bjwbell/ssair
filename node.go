@@ -14,6 +14,9 @@ type Node struct {
 	class NodeClass
 }
 
+func (n *Node) ssaVarType() {
+}
+
 func (n *Node) String() string {
 	return fmt.Sprintf("%#v", n)
 }

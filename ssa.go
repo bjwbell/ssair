@@ -711,7 +711,7 @@ func (s *state) linkForwardReferences() {
 			if v.Op != ssa.OpFwdRef {
 				continue
 			}
-			name := v.Aux.(*Node)
+			name := v.Aux.(ssaVar)
 			v.Op = ssa.OpCopy
 			v.Aux = nil
 			v.SetArgs1(s.lookupVarIncoming(b, v.Type, name))
@@ -720,20 +720,21 @@ func (s *state) linkForwardReferences() {
 }
 
 // lookupVarIncoming finds the variable's value at the start of block b.
-func (s *state) lookupVarIncoming(b *ssa.Block, t ssa.Type, name *Node) *ssa.Value {
+func (s *state) lookupVarIncoming(b *ssa.Block, t ssa.Type, name ssaVar) *ssa.Value {
 	// TODO(khr): have lookupVarIncoming overwrite the fwdRef or copy it
 	// will be used in, instead of having the result used in a copy value.
 	if b == s.f.Entry {
-		return nil
-		// if name == &memVar {
-		// 	return s.startmem
-		// }
-		// if canSSA(name) {
-		// 	v := s.entryNewValue0A(ssa.OpArg, t, name)
-		// 	// v starts with AuxInt == 0.
-		// 	s.addNamedValue(name, v)
-		// 	return v
-		// }
+		if name == &memVar {
+			return s.startmem
+		}
+		//return nil
+
+		if canSSA(name) {
+			v := s.entryNewValue0A(ssa.OpArg, t, name)
+			// v starts with AuxInt == 0.
+			//s.addNamedValue(name, v)
+			return v
+		}
 		// // variable is live at the entry block.  Load it.
 		// addr := s.decladdrs[name]
 		// if addr == nil {
@@ -765,7 +766,7 @@ func (s *state) lookupVarIncoming(b *ssa.Block, t ssa.Type, name *Node) *ssa.Val
 			// need a phi value
 			v := b.NewValue0(s.peekLine(), ssa.OpPhi, t)
 			v.AddArgs(vals...)
-			s.addNamedValue(name, v)
+			//s.addNamedValue(name, v)
 			return v
 		}
 	}
@@ -773,7 +774,7 @@ func (s *state) lookupVarIncoming(b *ssa.Block, t ssa.Type, name *Node) *ssa.Val
 }
 
 // lookupVarOutgoing finds the variable's value at the end of block b.
-func (s *state) lookupVarOutgoing(b *ssa.Block, t ssa.Type, name *Node) *ssa.Value {
+func (s *state) lookupVarOutgoing(b *ssa.Block, t ssa.Type, name ssaVar) *ssa.Value {
 	return nil
 	// m := s.defvars[b.ID]
 	// if v, ok := m[name]; ok {
@@ -1439,7 +1440,7 @@ func (s *state) assignStmt(stmt *ast.AssignStmt) {
 
 }
 
-func canSSA(n *Node) bool {
+func canSSA(n ssaVar) bool {
 	switch n.Class() {
 	case PEXTERN, PPARAMOUT, PPARAMREF:
 		return false
