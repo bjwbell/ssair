@@ -183,20 +183,20 @@ func (t *Type) PtrTo() ssa.Type {
 }
 
 // NumFields returns the # of fields of a struct, panics if t is not a types.Struct
-func (t *Type) NumFields() int64 {
+func (t *Type) NumFields() int {
 	if !t.IsStruct() {
 		panic("NumFields can only be called with Struct's")
 	}
 	s := t.Type.(*types.Struct)
-	return int64(s.NumFields())
+	return s.NumFields()
 }
 
 // FieldTypes returns the type of ith field of the struct and panics on error
-func (t *Type) FieldType(i int64) ssa.Type {
+func (t *Type) FieldType(i int) ssa.Type {
 	if s := t.Struct(); s == nil {
 		panic("FieldType can only be called with Struct's")
 	} else {
-		if int64(s.NumFields()) <= i {
+		if s.NumFields() <= i {
 			panic("Invalid field #")
 		}
 		field := Type{s.Field(int(i)).Type()}
@@ -205,11 +205,11 @@ func (t *Type) FieldType(i int64) ssa.Type {
 }
 
 // FieldOff returns the offset of ith field of the struct and panics on error
-func (t *Type) FieldOff(i int64) int64 {
+func (t *Type) FieldOff(i int) int64 {
 	if s := t.Struct(); s == nil {
 		panic("FieldOff can only be called with Struct's")
 	} else {
-		if int64(s.NumFields()) <= i {
+		if s.NumFields() <= i {
 			panic("Invalid field #")
 		}
 		std := StdSizes()
@@ -258,4 +258,31 @@ func (t *Type) Bound() int64 {
 
 func (t *Type) Width() int64 {
 	return t.Size()
+}
+
+// compare types, returning one of CMPlt, CMPeq, CMPgt.
+func (t *Type) Compare(t2 ssa.Type) ssa.Cmp {
+	if t.Equal(t2) {
+		return ssa.CMPeq
+	}
+	// TODO
+	return ssa.CMPlt
+}
+
+// given []T or *T or [n]T, return T
+func (t *Type) ElemType() ssa.Type {
+	// TODO
+	return nil
+}
+
+// name of ith field of the struct
+func (t *Type) FieldName(i int) string {
+	// TODO
+	return "<ssair.Type.FieldName>"
+}
+
+
+func (t *Type) IsPtrShaped() bool {
+	// TODO
+	return false
 }

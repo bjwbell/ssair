@@ -81,23 +81,61 @@ func Fatalf(format string, args ...interface{}) {
 }
 
 // Fatal reports a compiler error and exits.
-func (e *ssaExport) Fatalf(msg string, args ...interface{}) {
+func (e *ssaExport) Fatalf(line int32, msg string, args ...interface{}) {
 	Fatalf(msg, args...)
 }
 
 // Unimplemented reports that the function cannot be compiled.
 // It will be removed once SSA work is complete.
-func (e *ssaExport) Unimplementedf(msg string, args ...interface{}) {
+func (e *ssaExport) Unimplementedf(line int32, msg string, args ...interface{}) {
 	Fatalf(msg, args...)
 }
 
 // Warnl reports a "warning", which is usually flag-triggered
 // logging output for the benefit of tests.
-func (e *ssaExport) Warnl(line int, fmt_ string, args ...interface{}) {
+func (e *ssaExport) Warnl(line int32, fmt_ string, args ...interface{}) {
 	panic("Warnl")
 	//Warnl(line, fmt_, args...)
 }
 
 func (e *ssaExport) Debug_checknil() bool {
 	return false
+}
+
+func (e *ssaExport) Line(l int32) string {
+	return "<ssaExport.Line>"
+}
+
+// Log returns true if logging is not a no-op
+// some logging calls account for more than a few heap allocations.
+func (e *ssaExport) Log() bool {
+	return true
+}
+
+// A LocalSlot is a location in the stack frame.
+// It is (possibly a subpiece of) a PPARAM, PPARAMOUT, or PAUTO ONAME node.
+
+func (e *ssaExport) SplitString(localSlot ssa.LocalSlot) (ssa.LocalSlot, ssa.LocalSlot) {
+	// TODO
+	return ssa.LocalSlot{}, ssa.LocalSlot{}
+}
+
+func (e *ssaExport) SplitInterface(localSlot ssa.LocalSlot) (ssa.LocalSlot, ssa.LocalSlot) {
+	// TODO
+	return ssa.LocalSlot{}, ssa.LocalSlot{}
+}
+
+func (e *ssaExport) SplitSlice(localSlot ssa.LocalSlot) (ssa.LocalSlot, ssa.LocalSlot, ssa.LocalSlot) {
+	// TODO
+	return ssa.LocalSlot{}, ssa.LocalSlot{}, ssa.LocalSlot{}
+}
+
+func (e *ssaExport) SplitComplex(localSlot ssa.LocalSlot) (ssa.LocalSlot, ssa.LocalSlot) {
+	// TODO
+	return ssa.LocalSlot{}, ssa.LocalSlot{}
+}
+
+func (e *ssaExport) SplitStruct(localSlot ssa.LocalSlot, i int) ssa.LocalSlot {
+	// TODO
+	return ssa.LocalSlot{}
 }

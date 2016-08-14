@@ -281,7 +281,7 @@ func buildSSA(ftok *token.File, f *ast.File, fn *ast.FuncDecl, fnType *types.Fun
 	s.fnDecl = fn
 	s.fnType = fnType
 	s.fnInfo = fnInfo
-	s.config = ssa.NewConfig(arch, &e, &link)
+	s.config = ssa.NewConfig(arch, &e, &link, false)
 	s.f = s.config.NewFunc()
 	s.f.Name = fnType.Name()
 	//s.f.Entry = s.f.NewBlock(ssa.BlockPlain)

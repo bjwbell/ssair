@@ -115,14 +115,14 @@ func (s *state) label(ident *ast.Ident) *ssaLabel {
 }
 
 func (s *state) Logf(msg string, args ...interface{})   { s.config.Logf(msg, args...) }
-func (s *state) Fatalf(msg string, args ...interface{}) { s.config.Fatalf(msg, args...) }
+func (s *state) Fatalf(msg string, args ...interface{}) { s.config.Fatalf(0, msg, args...) }
 func (s *state) Unimplementedf(msg string, args ...interface{}) {
 	// TODO: comment/remove when no longer needed for debugging
 	fmt.Printf("s.UNIMPLEMENTED msg: %v\n", fmt.Sprintf(msg, args))
 
-	s.config.Unimplementedf(msg, args...)
+	s.config.Unimplementedf(0, msg, args...)
 }
-func (s *state) Warnl(line int, msg string, args ...interface{}) { s.config.Warnl(line, msg, args...) }
+func (s *state) Warnl(line int32, msg string, args ...interface{}) { s.config.Warnl(line, msg, args...) }
 func (s *state) Debug_checknil() bool                            { return s.config.Debug_checknil() }
 
 var (
@@ -748,7 +748,7 @@ func (s *state) lookupVarIncoming(b *ssa.Block, t ssa.Type, name ssaVar) *ssa.Va
 	}
 	var vals []*ssa.Value
 	for _, p := range b.Preds {
-		vals = append(vals, s.lookupVarOutgoing(p, t, name))
+		vals = append(vals, s.lookupVarOutgoing(p.Block(), t, name))
 	}
 	if len(vals) == 0 {
 		// This block is dead; we have no predecessors and we're not the entry block.
